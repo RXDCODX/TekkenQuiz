@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tekken Move Quiz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Tektur:wght@500;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="ambient-bg" aria-hidden="true"></div>
+    <div class="grain-layer" aria-hidden="true"></div>
+
+    <div id="app" class="app-shell">
+      <section id="startScreen" class="screen start-screen">
+        <div class="panel intro-panel reveal">
+          <p class="eyebrow">Tekken Move Trainer</p>
+          <h1>Видео-квиз по фреймдате и инпутам</h1>
+          <p class="description">
+            Смотри удар, отвечай на <strong>On Block</strong> (+1 балл) или на
+            <strong>Input</strong> (+0.2 балла). Ошибся один раз - игра окончена.
+          </p>
+
+          <div class="start-form">
+            <label for="nicknameInput">Твой ник</label>
+            <input
+              id="nicknameInput"
+              type="text"
+              maxlength="24"
+              autocomplete="nickname"
+              placeholder="Пример: KazuyaMain"
+            />
+            <button id="startButton" class="cta-button" type="button" disabled>
+              Начать игру
+            </button>
+          </div>
+
+          <p id="loadingStatus" class="loading-status">Загружаю базу ударов...</p>
+        </div>
+      </section>
+
+      <section id="gameScreen" class="screen hidden">
+        <header class="top-bar reveal">
+          <div class="player-box">
+            Игрок:
+            <strong id="playerNickname">-</strong>
+          </div>
+
+          <div class="score-box">
+            Угадано:
+            <strong><span id="roundCurrent">0</span>/<span id="roundTotal">0</span></strong>
+          </div>
+
+          <div class="score-box points-box">
+            Очки:
+            <strong id="scoreValue">0.0</strong>
+            <div id="scoreGainLayer" class="score-gain-layer" aria-hidden="true"></div>
+          </div>
+        </header>
+
+        <main class="game-grid">
+          <article class="panel video-panel reveal delay-1">
+            <div class="video-head">
+              <p class="eyebrow">Текущий удар</p>
+              <h2 id="characterName">...</h2>
+            </div>
+
+            <div class="video-frame">
+              <video
+                id="moveVideo"
+                class="move-video"
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="auto"
+              ></video>
+              <div id="videoFallback" class="video-fallback hidden">
+                Видео недоступно, перехожу к следующему удару...
+              </div>
+            </div>
+
+            <section class="answer-panel-inner reveal delay-2">
+              <h3>Твой ответ</h3>
+              <p class="answer-guide">
+                Можно ответить только одним способом: либо On Block (+1 балл), либо Input (+0.2 балла).
+              </p>
+
+              <div class="answer-block">
+                <label for="blockInput">Фреймдата удара на блоке (+1)</label>
+                <input id="blockInput" type="text" placeholder="Пример: -12 или +3" />
+                <button id="submitBlockButton" class="answer-button" type="button">
+                  Проверить On Block
+                </button>
+              </div>
+
+              <div class="answer-block">
+                <label for="commandInput">Инпут удара (+0.2)</label>
+                <input id="commandInput" type="text" placeholder="Пример: df+2" />
+                <button id="submitCommandButton" class="answer-button" type="button">
+                  Проверить Input
+                </button>
+              </div>
+
+              <p id="statusMessage" class="status-message">
+                Смотри видео. За On Block +1 балл, за Input +0.2 балла.
+              </p>
+            </section>
+          </article>
+        </main>
+      </section>
+
+      <section id="resultScreen" class="screen hidden">
+        <div id="resultCard" class="panel result-panel reveal">
+          <p class="eyebrow">Game Over</p>
+          <h2>Результат игрока <span id="resultNickname">-</span></h2>
+
+          <div class="result-stats">
+            <div class="result-item">
+              <span>Угадано</span>
+              <strong id="resultHits">0/0</strong>
+            </div>
+            <div class="result-item">
+              <span>Очки</span>
+              <strong id="resultScore">0.0</strong>
+            </div>
+            <div class="result-item">
+              <span>Точность</span>
+              <strong id="resultAccuracy">0%</strong>
+            </div>
+            <div class="result-item">
+              <span>Дата</span>
+              <strong id="resultDate">-</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button id="screenshotButton" class="cta-button" type="button">
+            Сделать скрин результата
+          </button>
+          <button id="restartButton" class="answer-button" type="button">
+            Играть снова
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
