@@ -32,6 +32,7 @@ const DATA_PATH = `${import.meta.env.BASE_URL}data/moves.json`;
 const SUCCESS_FLASH_CLASS = "success-flash";
 const NEXT_ROUND_DELAY_MS = 900;
 const SANDBOX_WRONG_DELAY_MS = 1500;
+const NA_FRAME_HELP_DELAY_MS = 1700;
 const SCREENSHOT_BG_COLOR = "#0f1d2a";
 const APP_COMMIT_SHA =
   cleanText(import.meta.env.VITE_COMMIT_SHA, "dev").trim() || "dev";
@@ -75,6 +76,9 @@ export function App(): JSX.Element {
   );
   const [sandboxFeedback, setSandboxFeedback] = useState<{
     typedValue: string;
+    correctValue: string;
+  } | null>(null);
+  const [naFrameFeedback, setNaFrameFeedback] = useState<{
     correctValue: string;
   } | null>(null);
   const [devAnswerVisible, setDevAnswerVisible] = useState(false);
@@ -232,6 +236,7 @@ export function App(): JSX.Element {
     setCommandInput("");
     setCorrectFlashMode(null);
     setSandboxFeedback(null);
+    setNaFrameFeedback(null);
 
     const nextMove = pullNextMove();
     if (!nextMove) {
@@ -284,6 +289,7 @@ export function App(): JSX.Element {
     setScoreGains([]);
     setCorrectFlashMode(null);
     setSandboxFeedback(null);
+    setNaFrameFeedback(null);
     setDevAnswerVisible(false);
     setResultDate("-");
     setFailedMove(null);
@@ -302,6 +308,7 @@ export function App(): JSX.Element {
     clearTimers();
     roundLockedRef.current = true;
     setSandboxFeedback(null);
+    setNaFrameFeedback(null);
     setFailedMove(null);
     setFailedAnswerMode(null);
     setFailedTypedValue("");
@@ -397,6 +404,17 @@ export function App(): JSX.Element {
       roundTimerRef.current = window.setTimeout(() => {
         nextRound();
       }, NEXT_ROUND_DELAY_MS);
+
+      return;
+    }
+
+    if (answerType === "block" && currentMove.onBlockAnswer === "N/A") {
+      playErrorSound();
+      setNaFrameFeedback({ correctValue: currentMove.onBlockAnswer });
+
+      roundTimerRef.current = window.setTimeout(() => {
+        nextRound();
+      }, NA_FRAME_HELP_DELAY_MS);
 
       return;
     }
@@ -607,6 +625,7 @@ export function App(): JSX.Element {
                   commandInput={commandInput}
                   correctFlashMode={correctFlashMode}
                   sandboxFeedback={sandboxFeedback}
+                  naFrameFeedback={naFrameFeedback}
                   devMode={IS_DEV_MODE}
                   devVisible={devAnswerVisible}
                   devCorrectOnBlock={currentMove?.onBlockAnswer ?? "N/A"}

@@ -9,6 +9,9 @@ interface AnswerPanelProps {
     typedValue: string;
     correctValue: string;
   } | null;
+  naFrameFeedback: {
+    correctValue: string;
+  } | null;
   devMode: boolean;
   devVisible: boolean;
   devCorrectOnBlock: string;
@@ -27,6 +30,7 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
     commandInput,
     correctFlashMode,
     sandboxFeedback,
+    naFrameFeedback,
     devMode,
     devVisible,
     devCorrectOnBlock,
@@ -86,6 +90,14 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
           <code>{sandboxFeedback.typedValue}</code>
           <span>Правильный ответ:</span>
           <code>{sandboxFeedback.correctValue}</code>
+        </div>
+      ) : null}
+
+      {naFrameFeedback ? (
+        <div className="na-frame-feedback" role="status" aria-live="polite">
+          <span className="na-frame-feedback-title">Внимание</span>
+          <span>Для этого удара правильный ответ по фреймдате:</span>
+          <code>{naFrameFeedback.correctValue}</code>
         </div>
       ) : null}
 
