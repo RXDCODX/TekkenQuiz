@@ -20,6 +20,7 @@ interface AnswerPanelProps {
   onCommandInputChange: (value: string) => void;
   onSubmitBlock: () => void;
   onSubmitCommand: () => void;
+  onSandboxProceed: () => void;
   onToggleDevVisible: () => void;
 }
 
@@ -39,6 +40,7 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
     onCommandInputChange,
     onSubmitBlock,
     onSubmitCommand,
+    onSandboxProceed,
     onToggleDevVisible,
   } = props;
 
@@ -84,18 +86,20 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
       </div>
 
       {isSandboxMode && sandboxFeedback ? (
-        <>
-          <div className="sandbox-feedback" role="status" aria-live="polite">
-            <span className="sandbox-feedback-title">Неверно.</span>
-            <span>Твой ответ:</span>
-            <code>{sandboxFeedback.typedValue}</code>
-            <span>Правильный ответ:</span>
-            <code>{sandboxFeedback.correctValue}</code>
-          </div>
-          <div className="sandbox-feedback-progress" aria-hidden="true">
-            <span className="sandbox-feedback-progress-fill"></span>
-          </div>
-        </>
+        <button
+          className="sandbox-feedback sandbox-feedback-button has-tooltip"
+          type="button"
+          onClick={onSandboxProceed}
+          data-tooltip="Нажми, чтобы перейти к следующему удару"
+          title="Нажми, чтобы перейти к следующему удару"
+          aria-label="Неверно. Нажми, чтобы перейти к следующему удару"
+        >
+          <span className="sandbox-feedback-title">Неверно.</span>
+          <span>Твой ответ:</span>
+          <code>{sandboxFeedback.typedValue}</code>
+          <span>Правильный ответ:</span>
+          <code>{sandboxFeedback.correctValue}</code>
+        </button>
       ) : null}
 
       {naFrameFeedback ? (
