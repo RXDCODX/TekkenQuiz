@@ -31,7 +31,7 @@ import {
 const DATA_PATH = `${import.meta.env.BASE_URL}data/moves.json`;
 const SUCCESS_FLASH_CLASS = "success-flash";
 const NEXT_ROUND_DELAY_MS = 900;
-const SANDBOX_WRONG_DELAY_MS = 1500;
+const SANDBOX_WRONG_DELAY_MS = 3500;
 const NA_FRAME_HELP_DELAY_MS = 1700;
 const SCREENSHOT_BG_COLOR = "#0f1d2a";
 const APP_COMMIT_SHA =

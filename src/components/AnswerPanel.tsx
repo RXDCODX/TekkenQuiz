@@ -84,13 +84,18 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
       </div>
 
       {isSandboxMode && sandboxFeedback ? (
-        <div className="sandbox-feedback" role="status" aria-live="polite">
-          <span className="sandbox-feedback-title">Неверно.</span>
-          <span>Твой ответ:</span>
-          <code>{sandboxFeedback.typedValue}</code>
-          <span>Правильный ответ:</span>
-          <code>{sandboxFeedback.correctValue}</code>
-        </div>
+        <>
+          <div className="sandbox-feedback" role="status" aria-live="polite">
+            <span className="sandbox-feedback-title">Неверно.</span>
+            <span>Твой ответ:</span>
+            <code>{sandboxFeedback.typedValue}</code>
+            <span>Правильный ответ:</span>
+            <code>{sandboxFeedback.correctValue}</code>
+          </div>
+          <div className="sandbox-feedback-progress" aria-hidden="true">
+            <span className="sandbox-feedback-progress-fill"></span>
+          </div>
+        </>
       ) : null}
 
       {naFrameFeedback ? (
