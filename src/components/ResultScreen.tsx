@@ -1,8 +1,9 @@
 import type { RefObject } from "react";
-import type { AnswerMode, MoveRecord } from "../types";
+import type { AnswerMode, GameMode, MoveRecord } from "../types";
 import { capitalizeWord, formatScore } from "../utils";
 
 interface ResultScreenProps {
+  gameMode: GameMode;
   nickname: string;
   correctAnswered: number;
   totalAnswered: number;
@@ -18,6 +19,7 @@ interface ResultScreenProps {
 
 export function ResultScreen(props: ResultScreenProps): JSX.Element {
   const {
+    gameMode,
     nickname,
     correctAnswered,
     totalAnswered,
@@ -31,10 +33,14 @@ export function ResultScreen(props: ResultScreenProps): JSX.Element {
     resultCardRef,
   } = props;
 
+  const isSandboxMode = gameMode === "sandbox";
+
   return (
     <section className="screen">
       <div ref={resultCardRef} className="panel result-panel reveal">
-        <p className="eyebrow">Game Over</p>
+        <p className="eyebrow">
+          {isSandboxMode ? "Sandbox Complete" : "Game Over"}
+        </p>
         <h2>
           Результат игрока <span>{nickname || "Игрок"}</span>
         </h2>
@@ -46,17 +52,19 @@ export function ResultScreen(props: ResultScreenProps): JSX.Element {
               {correctAnswered}/{totalAnswered}
             </strong>
           </div>
-          <div className="result-item">
-            <span>Очки</span>
-            <strong>{formatScore(score)}</strong>
-          </div>
+          {!isSandboxMode ? (
+            <div className="result-item">
+              <span>Очки</span>
+              <strong>{formatScore(score)}</strong>
+            </div>
+          ) : null}
           <div className="result-item">
             <span>Дата</span>
             <strong>{resultDate}</strong>
           </div>
         </div>
 
-        {failedMove ? (
+        {failedMove && !isSandboxMode ? (
           <section className="result-loss-review">
             <h3>Разбор удара с ошибкой</h3>
             <p className="result-loss-text">

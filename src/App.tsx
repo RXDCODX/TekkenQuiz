@@ -1,5 +1,5 @@
 import html2canvas from "html2canvas";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnswerPanel } from "./components/AnswerPanel";
 import { AppFooter } from "./components/AppFooter";
 import { GameTopBar } from "./components/GameTopBar";
@@ -9,6 +9,7 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VideoPanel } from "./components/VideoPanel";
 import type {
   AnswerMode,
+  GameMode,
   MovePayloadObject,
   MovePayloadRecord,
   MoveRecord,
@@ -30,6 +31,7 @@ import {
 const DATA_PATH = `${import.meta.env.BASE_URL}data/moves.json`;
 const SUCCESS_FLASH_CLASS = "success-flash";
 const NEXT_ROUND_DELAY_MS = 900;
+const SANDBOX_WRONG_DELAY_MS = 1500;
 const SCREENSHOT_BG_COLOR = "#0f1d2a";
 const APP_COMMIT_SHA =
   cleanText(import.meta.env.VITE_COMMIT_SHA, "dev").trim() || "dev";
@@ -54,8 +56,11 @@ export function App(): JSX.Element {
 
   const [loadingStatus, setLoadingStatus] = useState("Загружаю базу ударов...");
   const [canStart, setCanStart] = useState(false);
+  const [gameMode, setGameMode] = useState<GameMode>("classic");
+  const [sandboxCharacter, setSandboxCharacter] = useState("");
 
   const [currentRound, setCurrentRound] = useState(0);
+  const [totalRounds, setTotalRounds] = useState(0);
   const [totalAnswered, setTotalAnswered] = useState(0);
   const [correctAnswered, setCorrectAnswered] = useState(0);
   const [score, setScore] = useState(0);
@@ -68,6 +73,10 @@ export function App(): JSX.Element {
   const [correctFlashMode, setCorrectFlashMode] = useState<AnswerMode | null>(
     null,
   );
+  const [sandboxFeedback, setSandboxFeedback] = useState<{
+    typedValue: string;
+    correctValue: string;
+  } | null>(null);
   const [devAnswerVisible, setDevAnswerVisible] = useState(false);
 
   const [resultDate, setResultDate] = useState("-");
@@ -83,6 +92,18 @@ export function App(): JSX.Element {
   const roundTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
   const resultCardRef = useRef<HTMLDivElement>(null);
+
+  const characterOptions = useMemo(() => {
+    const characters = new Set<string>();
+
+    for (const move of moves) {
+      characters.add(move.character);
+    }
+
+    return [...characters].sort((left, right) => left.localeCompare(right));
+  }, [moves]);
+
+  const isSandboxMode = gameMode === "sandbox";
 
   useEffect(() => {
     void loadDatabase();
@@ -101,6 +122,20 @@ export function App(): JSX.Element {
       // Ignore storage errors in private mode.
     }
   }, [theme]);
+
+  useEffect(() => {
+    setSandboxCharacter((currentValue) => {
+      if (characterOptions.length === 0) {
+        return "";
+      }
+
+      if (currentValue && characterOptions.includes(currentValue)) {
+        return currentValue;
+      }
+
+      return characterOptions[0];
+    });
+  }, [characterOptions]);
 
   async function loadDatabase(): Promise<void> {
     setLoadingStatus("Загружаю базу ударов...");
@@ -196,6 +231,7 @@ export function App(): JSX.Element {
     setBlockInput("");
     setCommandInput("");
     setCorrectFlashMode(null);
+    setSandboxFeedback(null);
 
     const nextMove = pullNextMove();
     if (!nextMove) {
@@ -211,9 +247,28 @@ export function App(): JSX.Element {
     setVideoError(false);
   }
 
+  function handleModeChange(nextMode: GameMode): void {
+    setGameMode(nextMode);
+
+    if (nextMode === "sandbox" && !sandboxCharacter && characterOptions[0]) {
+      setSandboxCharacter(characterOptions[0]);
+    }
+  }
+
   function startGame(): void {
     if (moves.length === 0) {
       setLoadingStatus("База не загружена. Проверь /data/moves.json.");
+      return;
+    }
+
+    const availableMoves = isSandboxMode
+      ? moves.filter((move) => move.character === sandboxCharacter)
+      : moves;
+
+    if (availableMoves.length === 0) {
+      setLoadingStatus(
+        "Для песочницы не нашлось ударов. Выбери другого персонажа.",
+      );
       return;
     }
 
@@ -222,18 +277,20 @@ export function App(): JSX.Element {
     setNickname(cleanText(nicknameInput, "Игрок"));
     setCurrentMove(null);
     setCurrentRound(0);
+    setTotalRounds(availableMoves.length);
     setTotalAnswered(0);
     setCorrectAnswered(0);
     setScore(0);
     setScoreGains([]);
     setCorrectFlashMode(null);
+    setSandboxFeedback(null);
     setDevAnswerVisible(false);
     setResultDate("-");
     setFailedMove(null);
     setFailedAnswerMode(null);
     setFailedTypedValue("");
 
-    playPoolRef.current = shuffleArray([...moves]);
+    playPoolRef.current = shuffleArray([...availableMoves]);
     lastCharacterRef.current = "";
     roundLockedRef.current = false;
 
@@ -244,6 +301,7 @@ export function App(): JSX.Element {
   function finishByCompletion(): void {
     clearTimers();
     roundLockedRef.current = true;
+    setSandboxFeedback(null);
     setFailedMove(null);
     setFailedAnswerMode(null);
     setFailedTypedValue("");
@@ -297,6 +355,10 @@ export function App(): JSX.Element {
       return;
     }
 
+    if (isSandboxMode && answerType === "command") {
+      return;
+    }
+
     const typedValue = cleanText(
       answerType === "block" ? blockInput : commandInput,
       "",
@@ -323,14 +385,33 @@ export function App(): JSX.Element {
 
       playSuccessSound();
       setCorrectAnswered((value) => value + 1);
-      setScore((value) => value + gained);
       setCorrectFlashMode(answerType);
-      pushScoreGain(gained);
+
+      if (!isSandboxMode) {
+        setScore((value) => value + gained);
+        pushScoreGain(gained);
+      }
+
       flashSuccessEdges();
 
       roundTimerRef.current = window.setTimeout(() => {
         nextRound();
       }, NEXT_ROUND_DELAY_MS);
+
+      return;
+    }
+
+    if (isSandboxMode) {
+      playErrorSound();
+
+      setSandboxFeedback({
+        typedValue,
+        correctValue: currentMove.onBlockAnswer,
+      });
+
+      roundTimerRef.current = window.setTimeout(() => {
+        nextRound();
+      }, SANDBOX_WRONG_DELAY_MS);
 
       return;
     }
@@ -486,7 +567,12 @@ export function App(): JSX.Element {
             nicknameInput={nicknameInput}
             loadingStatus={loadingStatus}
             canStart={canStart}
+            mode={gameMode}
+            characterOptions={characterOptions}
+            sandboxCharacter={sandboxCharacter}
             onNicknameChange={setNicknameInput}
+            onModeChange={handleModeChange}
+            onSandboxCharacterChange={setSandboxCharacter}
             onStart={startGame}
           />
         ) : null}
@@ -494,9 +580,10 @@ export function App(): JSX.Element {
         {screen === "game" ? (
           <section className="screen">
             <GameTopBar
+              gameMode={gameMode}
               nickname={nickname}
               currentRound={currentRound}
-              totalRounds={moves.length}
+              totalRounds={totalRounds}
               score={score}
               scoreGains={scoreGains}
               onScoreGainDone={(id) => {
@@ -515,9 +602,11 @@ export function App(): JSX.Element {
                 onVideoError={handleVideoError}
               >
                 <AnswerPanel
+                  gameMode={gameMode}
                   blockInput={blockInput}
                   commandInput={commandInput}
                   correctFlashMode={correctFlashMode}
+                  sandboxFeedback={sandboxFeedback}
                   devMode={IS_DEV_MODE}
                   devVisible={devAnswerVisible}
                   devCorrectOnBlock={currentMove?.onBlockAnswer ?? "N/A"}
@@ -537,6 +626,7 @@ export function App(): JSX.Element {
 
         {screen === "result" ? (
           <ResultScreen
+            gameMode={gameMode}
             nickname={nickname}
             correctAnswered={correctAnswered}
             totalAnswered={totalAnswered}

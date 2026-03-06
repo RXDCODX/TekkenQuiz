@@ -1,7 +1,8 @@
-import type { ScoreGainToken } from "../types";
+import type { GameMode, ScoreGainToken } from "../types";
 import { formatScore } from "../utils";
 
 interface GameTopBarProps {
+  gameMode: GameMode;
   nickname: string;
   currentRound: number;
   totalRounds: number;
@@ -12,6 +13,7 @@ interface GameTopBarProps {
 
 export function GameTopBar(props: GameTopBarProps): JSX.Element {
   const {
+    gameMode,
     nickname,
     currentRound,
     totalRounds,
@@ -28,27 +30,34 @@ export function GameTopBar(props: GameTopBarProps): JSX.Element {
       </div>
 
       <div className="score-box">
-        Угадано:
+        Раунд:
         <strong>
           {currentRound}/{totalRounds}
         </strong>
       </div>
 
-      <div className="score-box points-box">
-        Очки:
-        <strong>{formatScore(score)}</strong>
-        <div className="score-gain-layer" aria-hidden="true">
-          {scoreGains.map((token) => (
-            <span
-              key={token.id}
-              className="score-gain"
-              onAnimationEnd={() => onScoreGainDone(token.id)}
-            >
-              {token.text}
-            </span>
-          ))}
+      {gameMode === "sandbox" ? (
+        <div className="score-box">
+          Режим:
+          <strong>Песочница</strong>
         </div>
-      </div>
+      ) : (
+        <div className="score-box points-box">
+          Очки:
+          <strong>{formatScore(score)}</strong>
+          <div className="score-gain-layer" aria-hidden="true">
+            {scoreGains.map((token) => (
+              <span
+                key={token.id}
+                className="score-gain"
+                onAnimationEnd={() => onScoreGainDone(token.id)}
+              >
+                {token.text}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

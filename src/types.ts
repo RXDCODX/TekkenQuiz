@@ -1,5 +1,7 @@
 export type AnswerMode = "block" | "command";
 
+export type GameMode = "classic" | "sandbox";
+
 export type ScreenMode = "start" | "game" | "result";
 
 export interface MoveAnswers {

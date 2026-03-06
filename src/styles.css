@@ -230,12 +230,43 @@ h1 {
   max-width: 340px;
 }
 
+.mode-switch {
+  margin-top: 1.15rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mode-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.44rem 0.76rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--panel-strong) 75%, transparent);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.mode-chip:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
+}
+
+.mode-chip.active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--line));
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel-strong));
+}
+
 label {
   color: var(--muted);
   font-size: 0.92rem;
 }
 
-input {
+input,
+.select-input {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel-strong);
@@ -245,7 +276,8 @@ input {
   transition: border-color 140ms ease, transform 140ms ease;
 }
 
-input:focus {
+input:focus,
+.select-input:focus {
   border-color: var(--accent);
   transform: translateY(-1px);
   outline: none;
@@ -427,6 +459,32 @@ input:focus {
     0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
     0 0 22px color-mix(in srgb, var(--accent) 32%, transparent);
   animation: answerGlowPulse 780ms ease-out;
+}
+
+.sandbox-feedback {
+  margin-top: 0.74rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 48%, var(--line));
+  border-radius: 12px;
+  padding: 0.62rem 0.72rem;
+  color: var(--text);
+  background: color-mix(in srgb, var(--danger) 13%, var(--answer-block-bg));
+}
+
+.sandbox-feedback-title {
+  color: var(--danger);
+  font-weight: 800;
+}
+
+.sandbox-feedback code {
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel-strong) 74%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.07rem 0.33rem;
 }
 
 .dev-answer-box {
