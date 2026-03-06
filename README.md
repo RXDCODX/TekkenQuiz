@@ -2,10 +2,12 @@
 
 Игра-тренажер по мувлистам Tekken 8 на базе данных с `okizeme.gg`.
 
-Фронтенд собран на `Vite + TypeScript`.
+Фронтенд собран на `Vite + React + TypeScript`.
 
 Для деплоя как static-сайта настроен workflow GitHub Actions: `.github/workflows/deploy-pages.yml`.
 Также добавлена публикация через пакет `gh-pages`.
+
+UI разбит на React-компоненты в `src/components`.
 
 ## Что делает проект
 

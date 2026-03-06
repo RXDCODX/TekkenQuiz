@@ -1,3 +1,5 @@
+import react from "@vitejs/plugin-react";
+import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 
 function normalizeBasePath(rawBase: string | undefined): string {
@@ -33,13 +35,37 @@ function inferCiBasePath(): string {
 }
 
 const resolvedBase = normalizeBasePath(
-  process.env.VITE_BASE_PATH ?? (process.env.GITHUB_ACTIONS === "true" ? inferCiBasePath() : "/")
+  process.env.VITE_BASE_PATH ??
+    (process.env.GITHUB_ACTIONS === "true" ? inferCiBasePath() : "/"),
 );
+
+function resolveCommitSha(): string {
+  if (process.env.VITE_COMMIT_SHA && process.env.VITE_COMMIT_SHA.trim()) {
+    return process.env.VITE_COMMIT_SHA.trim();
+  }
+
+  try {
+    const sha = execSync("git rev-parse --short HEAD", {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+
+    return sha || "dev";
+  } catch {
+    return "dev";
+  }
+}
+
+const commitSha = resolveCommitSha();
 
 export default defineConfig({
   base: resolvedBase,
+  define: {
+    "import.meta.env.VITE_COMMIT_SHA": JSON.stringify(commitSha),
+  },
+  plugins: [react()],
   server: {
     host: true,
-    port: 5173
-  }
+    port: 5173,
+  },
 });
