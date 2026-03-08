@@ -3,6 +3,7 @@ import type { AnswerMode, GameMode } from "../types";
 interface AnswerPanelProps {
   gameMode: GameMode;
   blockInput: string;
+  blockInputError: string | null;
   commandInput: string;
   correctFlashMode: AnswerMode | null;
   sandboxFeedback: {
@@ -28,6 +29,7 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
   const {
     gameMode,
     blockInput,
+    blockInputError,
     commandInput,
     correctFlashMode,
     sandboxFeedback,
@@ -70,8 +72,11 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
         <input
           id="blockInput"
           type="text"
+          inputMode="numeric"
           placeholder="Пример: -12 или +3"
           value={blockInput}
+          className={blockInputError ? "input-invalid" : undefined}
+          aria-invalid={Boolean(blockInputError)}
           onChange={(event) => onBlockInputChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -80,6 +85,9 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
             }
           }}
         />
+        {blockInputError ? (
+          <span className="input-error-text">{blockInputError}</span>
+        ) : null}
         <button className="answer-button" type="button" onClick={onSubmitBlock}>
           Проверить фреймдату на блоке
         </button>

@@ -13,18 +13,29 @@ import type {
   MovePayloadObject,
   MovePayloadRecord,
   MoveRecord,
+  SandboxHitLevelFilter,
+  SandboxMoveFilters,
+  SandboxMovePropertyFilter,
+  SandboxSortBy,
+  SandboxStateFilter,
   ScoreGainToken,
   ScreenMode,
+  StartupFilterBand,
 } from "./types";
 import {
   capitalizeWord,
+  classifyFrameBand,
   cleanText,
   compareCommandAnswer,
   compareFrameAnswer,
+  extractDamageNumber,
+  extractFrameNumber,
+  isFrameInputComplete,
   mapMoveRecord,
   playErrorSound,
   playSuccessSound,
   safeFileToken,
+  sanitizeFrameInput,
   shuffleArray,
 } from "./utils";
 
@@ -33,9 +44,373 @@ const SUCCESS_FLASH_CLASS = "success-flash";
 const NEXT_ROUND_DELAY_MS = 900;
 const NA_FRAME_HELP_DELAY_MS = 1700;
 const SCREENSHOT_BG_COLOR = "#0f1d2a";
-const APP_COMMIT_SHA =
-  cleanText(import.meta.env.VITE_COMMIT_SHA, "dev").trim() || "dev";
+const APP_VERSION =
+  cleanText(import.meta.env.VITE_APP_VERSION, "0.0.0-dev.0+dev").trim() ||
+  "0.0.0-dev.0+dev";
 const IS_DEV_MODE = import.meta.env.DEV;
+
+const DEFAULT_SANDBOX_FILTERS: SandboxMoveFilters = {
+  sortBy: "random",
+  onBlockBands: [],
+  onHitBands: [],
+  startup: [],
+  hitLevels: [],
+  properties: [],
+  states: [],
+  throwMode: "all",
+};
+
+function tokenizeLooseText(value: string): Set<string> {
+  const normalized = String(value)
+    .toLowerCase()
+    .replace(/\r/g, " ")
+    .replace(/\n/g, " ");
+
+  return new Set(
+    normalized
+      .split(/[^a-z0-9+~.-]+/)
+      .map((token) => token.trim())
+      .filter(Boolean),
+  );
+}
+
+function getStartupBand(value: string): StartupFilterBand | null {
+  const startup = extractFrameNumber(value);
+  if (startup === null) {
+    return null;
+  }
+
+  if (startup < 10) {
+    return "under10";
+  }
+
+  if (startup > 20) {
+    return "over20";
+  }
+
+  return `${startup}` as StartupFilterBand;
+}
+
+function isThrowMove(move: MoveRecord): boolean {
+  const commandText = move.command.toLowerCase();
+  const combined =
+    `${move.command} ${move.name} ${move.notes} ${move.hitLevel}`.toLowerCase();
+  const hitLevelTokens = tokenizeLooseText(move.hitLevel);
+
+  if (commandText.includes("1+3") || commandText.includes("2+4")) {
+    return true;
+  }
+
+  if (combined.includes("throw") || combined.includes("grab")) {
+    return true;
+  }
+
+  return hitLevelTokens.has("t") || hitLevelTokens.has("th");
+}
+
+function collectHitLevelFlags(move: MoveRecord): Set<SandboxHitLevelFilter> {
+  const flags = new Set<SandboxHitLevelFilter>();
+  const text = move.hitLevel.toLowerCase();
+  const tokens = tokenizeLooseText(move.hitLevel);
+
+  if (tokens.has("h") || text.includes("high")) {
+    flags.add("high");
+  }
+
+  if (tokens.has("m") || text.includes("mid")) {
+    flags.add("mid");
+  }
+
+  if (tokens.has("l") || text.includes(" low")) {
+    flags.add("low");
+  }
+
+  if (
+    tokens.has("sl") ||
+    text.includes("special low") ||
+    text.includes("s.l")
+  ) {
+    flags.add("specialLow");
+  }
+
+  if (
+    tokens.has("sm") ||
+    tokens.has("sp") ||
+    text.includes("special mid") ||
+    text.includes("s.m")
+  ) {
+    flags.add("specialMid");
+  }
+
+  if (
+    isThrowMove(move) ||
+    tokens.has("throw") ||
+    tokens.has("t") ||
+    tokens.has("th")
+  ) {
+    flags.add("throw");
+  }
+
+  return flags;
+}
+
+function collectPropertyFlags(
+  move: MoveRecord,
+  throwMove: boolean,
+): Set<SandboxMovePropertyFilter> {
+  const flags = new Set<SandboxMovePropertyFilter>();
+  const tags = tokenizeLooseText(move.tags);
+  const notesAndTransitions = `${move.notes} ${move.transitions}`.toLowerCase();
+  const hasPowerCrushTag = [...tags].some((token) => token.startsWith("pc"));
+
+  if (throwMove) {
+    flags.add("throw");
+  }
+
+  if (cleanText(move.onCounter, "N/A").toUpperCase() !== "N/A") {
+    flags.add("counterHit");
+  }
+
+  if (
+    tags.has("chp") ||
+    notesAndTransitions.includes("chip") ||
+    notesAndTransitions.includes("recoverable")
+  ) {
+    flags.add("chip");
+  }
+
+  if (notesAndTransitions.includes("jail")) {
+    flags.add("jails");
+  }
+
+  if (
+    notesAndTransitions.includes("parry") ||
+    notesAndTransitions.includes("reversal")
+  ) {
+    flags.add("parry");
+  }
+
+  if (hasPowerCrushTag || notesAndTransitions.includes("power crush")) {
+    flags.add("powerCrush");
+  }
+
+  if (tags.has("hom") || notesAndTransitions.includes("homing")) {
+    flags.add("homing");
+  }
+
+  if (tags.has("he") || notesAndTransitions.includes("heat engager")) {
+    flags.add("heatEngager");
+  }
+
+  if (tags.has("trn") || notesAndTransitions.includes("tornado")) {
+    flags.add("tornado");
+  }
+
+  if (
+    tags.has("fbr") ||
+    notesAndTransitions.includes("floor") ||
+    notesAndTransitions.includes("f!")
+  ) {
+    flags.add("floorInteraction");
+  }
+
+  if (
+    notesAndTransitions.includes("wall") ||
+    notesAndTransitions.includes("balcony") ||
+    notesAndTransitions.includes("w!")
+  ) {
+    flags.add("wallInteraction");
+  }
+
+  return flags;
+}
+
+function collectStateFlags(move: MoveRecord): Set<SandboxStateFilter> {
+  const flags = new Set<SandboxStateFilter>();
+  const commandUpper = move.command.toUpperCase();
+  const text =
+    `${move.command} ${move.name} ${move.notes} ${move.transitions}`.toLowerCase();
+
+  if (commandUpper.startsWith("WS.") || text.includes("while standing")) {
+    flags.add("whileStanding");
+  }
+
+  if (commandUpper.startsWith("SS.") || text.includes("sidestep")) {
+    flags.add("sidestep");
+  }
+
+  if (commandUpper.startsWith("FC.") || text.includes("full crouch")) {
+    flags.add("fullCrouch");
+  }
+
+  if (commandUpper.startsWith("H.") || text.includes("heat")) {
+    flags.add("heat");
+  }
+
+  if (commandUpper.startsWith("R.") || text.includes("rage")) {
+    flags.add("rage");
+  }
+
+  return flags;
+}
+
+function hasAnySelectedFlag<T extends string>(
+  selected: T[],
+  flags: Set<T>,
+): boolean {
+  if (selected.length === 0) {
+    return true;
+  }
+
+  return selected.some((item) => flags.has(item));
+}
+
+function moveMatchesSandboxFilters(
+  move: MoveRecord,
+  filters: SandboxMoveFilters,
+): boolean {
+  const throwMove = isThrowMove(move);
+
+  if (filters.throwMode === "only" && !throwMove) {
+    return false;
+  }
+
+  if (filters.throwMode === "exclude" && throwMove) {
+    return false;
+  }
+
+  if (filters.onBlockBands.length > 0) {
+    const blockBand = classifyFrameBand(move.onBlockAnswer);
+    if (!blockBand || !filters.onBlockBands.includes(blockBand)) {
+      return false;
+    }
+  }
+
+  if (filters.onHitBands.length > 0) {
+    const hitBand = classifyFrameBand(move.onHit);
+    if (!hitBand || !filters.onHitBands.includes(hitBand)) {
+      return false;
+    }
+  }
+
+  if (filters.startup.length > 0) {
+    const startupBand = getStartupBand(move.startup);
+    if (!startupBand || !filters.startup.includes(startupBand)) {
+      return false;
+    }
+  }
+
+  if (!hasAnySelectedFlag(filters.hitLevels, collectHitLevelFlags(move))) {
+    return false;
+  }
+
+  if (
+    !hasAnySelectedFlag(
+      filters.properties,
+      collectPropertyFlags(move, throwMove),
+    )
+  ) {
+    return false;
+  }
+
+  if (!hasAnySelectedFlag(filters.states, collectStateFlags(move))) {
+    return false;
+  }
+
+  return true;
+}
+
+function compareNullableNumbers(
+  left: number | null,
+  right: number | null,
+  direction: "asc" | "desc",
+): number {
+  if (left === null && right === null) {
+    return 0;
+  }
+
+  if (left === null) {
+    return 1;
+  }
+
+  if (right === null) {
+    return -1;
+  }
+
+  return direction === "asc" ? left - right : right - left;
+}
+
+function sortSandboxMoves(
+  items: MoveRecord[],
+  sortBy: SandboxSortBy,
+): MoveRecord[] {
+  if (sortBy === "random") {
+    return [...items];
+  }
+
+  return [...items].sort((left, right) => {
+    switch (sortBy) {
+      case "command-asc":
+        return left.command.localeCompare(right.command);
+      case "command-desc":
+        return right.command.localeCompare(left.command);
+      case "startup-asc":
+        return compareNullableNumbers(
+          extractFrameNumber(left.startup),
+          extractFrameNumber(right.startup),
+          "asc",
+        );
+      case "startup-desc":
+        return compareNullableNumbers(
+          extractFrameNumber(left.startup),
+          extractFrameNumber(right.startup),
+          "desc",
+        );
+      case "block-asc":
+        return compareNullableNumbers(
+          extractFrameNumber(left.onBlockAnswer),
+          extractFrameNumber(right.onBlockAnswer),
+          "asc",
+        );
+      case "block-desc":
+        return compareNullableNumbers(
+          extractFrameNumber(left.onBlockAnswer),
+          extractFrameNumber(right.onBlockAnswer),
+          "desc",
+        );
+      case "hit-asc":
+        return compareNullableNumbers(
+          extractFrameNumber(left.onHit),
+          extractFrameNumber(right.onHit),
+          "asc",
+        );
+      case "hit-desc":
+        return compareNullableNumbers(
+          extractFrameNumber(left.onHit),
+          extractFrameNumber(right.onHit),
+          "desc",
+        );
+      case "hitLevel-asc":
+        return left.hitLevel.localeCompare(right.hitLevel);
+      case "hitLevel-desc":
+        return right.hitLevel.localeCompare(left.hitLevel);
+      case "damage-asc":
+        return compareNullableNumbers(
+          extractDamageNumber(left.damage),
+          extractDamageNumber(right.damage),
+          "asc",
+        );
+      case "damage-desc":
+        return compareNullableNumbers(
+          extractDamageNumber(left.damage),
+          extractDamageNumber(right.damage),
+          "desc",
+        );
+      default:
+        return 0;
+    }
+  });
+}
 
 export function App(): JSX.Element {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -58,6 +433,9 @@ export function App(): JSX.Element {
   const [canStart, setCanStart] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>("classic");
   const [sandboxCharacter, setSandboxCharacter] = useState("");
+  const [sandboxFilters, setSandboxFilters] = useState<SandboxMoveFilters>(
+    DEFAULT_SANDBOX_FILTERS,
+  );
 
   const [currentRound, setCurrentRound] = useState(0);
   const [totalRounds, setTotalRounds] = useState(0);
@@ -66,6 +444,7 @@ export function App(): JSX.Element {
   const [score, setScore] = useState(0);
 
   const [blockInput, setBlockInput] = useState("");
+  const [blockInputError, setBlockInputError] = useState<string | null>(null);
   const [commandInput, setCommandInput] = useState("");
 
   const [videoError, setVideoError] = useState(false);
@@ -107,6 +486,22 @@ export function App(): JSX.Element {
   }, [moves]);
 
   const isSandboxMode = gameMode === "sandbox";
+
+  const sandboxCharacterMoves = useMemo(() => {
+    if (!sandboxCharacter) {
+      return [] as MoveRecord[];
+    }
+
+    return moves.filter((move) => move.character === sandboxCharacter);
+  }, [moves, sandboxCharacter]);
+
+  const sandboxFilteredMoves = useMemo(() => {
+    const filteredMoves = sandboxCharacterMoves.filter((move) =>
+      moveMatchesSandboxFilters(move, sandboxFilters),
+    );
+
+    return sortSandboxMoves(filteredMoves, sandboxFilters.sortBy);
+  }, [sandboxCharacterMoves, sandboxFilters]);
 
   useEffect(() => {
     void loadDatabase();
@@ -232,6 +627,7 @@ export function App(): JSX.Element {
     }
 
     setBlockInput("");
+    setBlockInputError(null);
     setCommandInput("");
     setCorrectFlashMode(null);
     setSandboxFeedback(null);
@@ -259,19 +655,43 @@ export function App(): JSX.Element {
     }
   }
 
+  function handleBlockInputChange(rawValue: string): void {
+    const compactValue = rawValue.replace(/\s+/g, "");
+    const sanitized = sanitizeFrameInput(rawValue);
+
+    setBlockInput(sanitized);
+
+    if (!compactValue) {
+      setBlockInputError(null);
+      return;
+    }
+
+    if (compactValue !== sanitized) {
+      setBlockInputError(
+        "Разрешены только цифры и знаки +/-. Лишние символы удалены.",
+      );
+      return;
+    }
+
+    if (sanitized === "+" || sanitized === "-") {
+      setBlockInputError("После знака нужно ввести число.");
+      return;
+    }
+
+    setBlockInputError(null);
+  }
+
   function startGame(): void {
     if (moves.length === 0) {
       setLoadingStatus("База не загружена. Проверь /data/moves.json.");
       return;
     }
 
-    const availableMoves = isSandboxMode
-      ? moves.filter((move) => move.character === sandboxCharacter)
-      : moves;
+    const availableMoves = isSandboxMode ? sandboxFilteredMoves : moves;
 
     if (availableMoves.length === 0) {
       setLoadingStatus(
-        "Для песочницы не нашлось ударов. Выбери другого персонажа.",
+        "Фильтры песочницы скрыли все удары. Ослабь фильтры или выбери другого персонажа.",
       );
       return;
     }
@@ -289,13 +709,17 @@ export function App(): JSX.Element {
     setCorrectFlashMode(null);
     setSandboxFeedback(null);
     setNaFrameFeedback(null);
+    setBlockInputError(null);
     setDevAnswerVisible(false);
     setResultDate("-");
     setFailedMove(null);
     setFailedAnswerMode(null);
     setFailedTypedValue("");
 
-    playPoolRef.current = shuffleArray([...availableMoves]);
+    playPoolRef.current =
+      isSandboxMode && sandboxFilters.sortBy !== "random"
+        ? [...availableMoves]
+        : shuffleArray([...availableMoves]);
     lastCharacterRef.current = "";
     roundLockedRef.current = false;
 
@@ -330,8 +754,6 @@ export function App(): JSX.Element {
       answerType === "block"
         ? (currentMove?.onBlockAnswer ?? "N/A")
         : (currentMove?.command ?? "N/A");
-    const answerLabel =
-      answerType === "block" ? "Фреймдата на блоке" : "Инпут удара";
 
     setResultDate(new Date().toLocaleString("ru-RU"));
     setScreen("result");
@@ -372,6 +794,17 @@ export function App(): JSX.Element {
 
     if (!typedValue) {
       return;
+    }
+
+    if (answerType === "block" && !isFrameInputComplete(typedValue)) {
+      setBlockInputError(
+        "Фреймдата должна быть числом со знаком +/- или без знака (например: -12, +3, 10).",
+      );
+      return;
+    }
+
+    if (answerType === "block") {
+      setBlockInputError(null);
     }
 
     roundLockedRef.current = true;
@@ -572,6 +1005,7 @@ export function App(): JSX.Element {
   function returnToStartScreen(): void {
     clearTimers();
     roundLockedRef.current = false;
+    setBlockInputError(null);
     setScreen("start");
   }
 
@@ -591,9 +1025,13 @@ export function App(): JSX.Element {
             mode={gameMode}
             characterOptions={characterOptions}
             sandboxCharacter={sandboxCharacter}
+            sandboxFilters={sandboxFilters}
+            sandboxFilteredCount={sandboxFilteredMoves.length}
+            sandboxTotalCount={sandboxCharacterMoves.length}
             onNicknameChange={setNicknameInput}
             onModeChange={handleModeChange}
             onSandboxCharacterChange={setSandboxCharacter}
+            onSandboxFiltersChange={setSandboxFilters}
             onStart={startGame}
           />
         ) : null}
@@ -625,6 +1063,7 @@ export function App(): JSX.Element {
                 <AnswerPanel
                   gameMode={gameMode}
                   blockInput={blockInput}
+                  blockInputError={blockInputError}
                   commandInput={commandInput}
                   correctFlashMode={correctFlashMode}
                   sandboxFeedback={sandboxFeedback}
@@ -633,7 +1072,7 @@ export function App(): JSX.Element {
                   devVisible={devAnswerVisible}
                   devCorrectOnBlock={currentMove?.onBlockAnswer ?? "N/A"}
                   devCorrectCommand={currentMove?.command ?? "N/A"}
-                  onBlockInputChange={setBlockInput}
+                  onBlockInputChange={handleBlockInputChange}
                   onCommandInputChange={setCommandInput}
                   onSubmitBlock={() => evaluateAnswer("block")}
                   onSubmitCommand={() => evaluateAnswer("command")}
@@ -664,7 +1103,7 @@ export function App(): JSX.Element {
           />
         ) : null}
 
-        <AppFooter commitSha={APP_COMMIT_SHA} />
+        <AppFooter version={APP_VERSION} />
       </div>
     </>
   );

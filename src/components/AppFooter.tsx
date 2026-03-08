@@ -1,9 +1,9 @@
 interface AppFooterProps {
-  commitSha: string;
+  version: string;
 }
 
 export function AppFooter(props: AppFooterProps): JSX.Element {
-  const { commitSha } = props;
+  const { version } = props;
 
   return (
     <footer className="app-footer">
@@ -19,7 +19,7 @@ export function AppFooter(props: AppFooterProps): JSX.Element {
         </a>
       </span>
       <span>
-        Версия: <code>{commitSha}</code>
+        Версия: <code>{version}</code>
       </span>
       <span>
         Благодарность порталу{" "}

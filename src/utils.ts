@@ -1,4 +1,7 @@
-import type { MovePayloadRecord, MoveRecord } from "./types";
+import type { FrameBand, MovePayloadRecord, MoveRecord } from "./types";
+
+const FRAME_INPUT_PARTIAL_PATTERN = /^[+-]?\d*$/;
+const FRAME_INPUT_COMPLETE_PATTERN = /^[+-]?\d+$/;
 
 let feedbackAudioContext: AudioContext | null = null;
 
@@ -112,6 +115,61 @@ export function extractFrameNumber(value: string): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+export function sanitizeFrameInput(value: string): string {
+  const compact = String(value).replace(/\s+/g, "");
+  if (!compact) {
+    return "";
+  }
+
+  if (FRAME_INPUT_PARTIAL_PATTERN.test(compact)) {
+    return compact;
+  }
+
+  const leadingSign = compact.startsWith("+")
+    ? "+"
+    : compact.startsWith("-")
+      ? "-"
+      : "";
+  const digits = compact.replace(/\D/g, "");
+
+  return `${leadingSign}${digits}`;
+}
+
+export function isFrameInputComplete(value: string): boolean {
+  return FRAME_INPUT_COMPLETE_PATTERN.test(cleanText(value, ""));
+}
+
+export function classifyFrameBand(value: string): FrameBand | null {
+  const frameNumber = extractFrameNumber(value);
+  if (frameNumber === null) {
+    return null;
+  }
+
+  if (frameNumber > 0) {
+    return "plus";
+  }
+
+  if (frameNumber === 0) {
+    return "neutral";
+  }
+
+  if (frameNumber >= -9) {
+    return "safe";
+  }
+
+  return "unsafe";
+}
+
+export function extractDamageNumber(value: string): number | null {
+  const match = String(value).match(/\d+/);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 export function normalizeFrameToken(value: string): string {
   const text = cleanText(value, "N/A").toUpperCase();
 
@@ -207,6 +265,7 @@ export function mapMoveRecord(record: MovePayloadRecord): MoveRecord | null {
 
   const character = cleanText(record.character, "").toLowerCase();
   const command = cleanText(record.command, "");
+  const name = cleanText(record.name, "No designated move name");
   const videoUrl = cleanText(record.videoUrl, "");
 
   if (!character || !command || !videoUrl) {
@@ -214,6 +273,14 @@ export function mapMoveRecord(record: MovePayloadRecord): MoveRecord | null {
   }
 
   const onBlockRaw = cleanText(record.onBlock ?? record.block, "N/A");
+  const onHit = cleanText(record.onHit ?? record.hit, "N/A");
+  const onCounter = cleanText(record.onCounter ?? record.counter, "N/A");
+  const startup = cleanText(record.startup, "N/A");
+  const hitLevel = cleanText(record.hitLevel, "N/A");
+  const damage = cleanText(record.damage, "N/A");
+  const notes = cleanText(record.notes, "N/A");
+  const tags = cleanText(record.tags, "N/A");
+  const transitions = cleanText(record.transitions, "N/A");
   const answers =
     record.answers && typeof record.answers === "object" ? record.answers : {};
 
@@ -227,9 +294,18 @@ export function mapMoveRecord(record: MovePayloadRecord): MoveRecord | null {
     id: cleanText(record.id, `${character}::${command}`),
     character,
     command,
+    name,
     videoUrl,
     onBlockRaw,
     onBlockAnswer,
+    onHit,
+    onCounter,
+    startup,
+    hitLevel,
+    damage,
+    notes,
+    tags,
+    transitions,
     commandStrict,
     commandLoose,
   };
