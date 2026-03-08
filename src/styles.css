@@ -265,6 +265,16 @@ h1 {
   max-width: 58ch;
 }
 
+.best-score-note {
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.best-score-note strong {
+  color: var(--accent);
+}
+
 .start-form {
   margin-top: 1.6rem;
   display: grid;
@@ -667,6 +677,10 @@ input.input-invalid,
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
+}
+
+.top-bar-sandbox {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .player-box,

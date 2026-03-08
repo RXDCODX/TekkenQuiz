@@ -83,6 +83,7 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
           id="blockInput"
           type="text"
           inputMode="numeric"
+          pattern="[0-9+-]*"
           placeholder="Пример: -12 или +3"
           value={blockInput}
           className={blockInputError ? "input-invalid" : undefined}

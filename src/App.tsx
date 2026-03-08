@@ -46,6 +46,8 @@ const NA_FRAME_HELP_DELAY_MS = 1700;
 const SCREENSHOT_BG_COLOR = "#0f1d2a";
 const PROGRESS_STORAGE_KEY = "tekken-progress-v1";
 const PROGRESS_SCHEMA_VERSION = 1;
+const CLASSIC_BEST_SCORE_STORAGE_KEY = "tekken-classic-best-score-v1";
+const CLASSIC_BEST_SCORE_SCHEMA_VERSION = 1;
 const APP_VERSION =
   cleanText(import.meta.env.VITE_APP_VERSION, "0.0.0-dev.0+dev").trim() ||
   "0.0.0-dev.0+dev";
@@ -75,11 +77,19 @@ interface PersistedGameSnapshot {
   totalAnswered: number;
   correctAnswered: number;
   score: number;
+  sandboxCurrentStreak: number;
+  sandboxBestStreak: number;
   currentMoveId: string;
   remainingMoveIds: string[];
   lastCharacter: string;
   blockInput: string;
   commandInput: string;
+}
+
+interface PersistedClassicBestScore {
+  version: number;
+  savedAt: number;
+  score: number;
 }
 
 function isSandboxSortBy(value: unknown): value is SandboxSortBy {
@@ -158,6 +168,10 @@ function normalizeNonNegativeNumber(value: unknown, fallback = 0): number {
   return Math.max(0, value);
 }
 
+function normalizeScoreToTenths(value: number): number {
+  return Math.round(Math.max(0, value) * 10) / 10;
+}
+
 function parseSavedProgress(
   rawValue: string | null,
 ): PersistedGameSnapshot | null {
@@ -193,6 +207,13 @@ function parseSavedProgress(
       currentRound,
       Math.floor(normalizeNonNegativeNumber(parsed.totalRounds, currentRound)),
     );
+    const sandboxCurrentStreak = Math.floor(
+      normalizeNonNegativeNumber(parsed.sandboxCurrentStreak),
+    );
+    const sandboxBestStreak = Math.max(
+      sandboxCurrentStreak,
+      Math.floor(normalizeNonNegativeNumber(parsed.sandboxBestStreak)),
+    );
 
     return {
       version: PROGRESS_SCHEMA_VERSION,
@@ -222,6 +243,8 @@ function parseSavedProgress(
         normalizeNonNegativeNumber(parsed.correctAnswered),
       ),
       score: normalizeNonNegativeNumber(parsed.score),
+      sandboxCurrentStreak,
+      sandboxBestStreak,
       currentMoveId: parsed.currentMoveId,
       remainingMoveIds: sanitizeStringArray(parsed.remainingMoveIds),
       lastCharacter:
@@ -233,6 +256,44 @@ function parseSavedProgress(
     };
   } catch {
     return null;
+  }
+}
+
+function parseSavedBestClassicScore(rawValue: string | null): number | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as
+      | number
+      | Partial<PersistedClassicBestScore>;
+
+    if (typeof parsed === "number") {
+      return normalizeScoreToTenths(parsed);
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    if (
+      typeof parsed.version === "number" &&
+      parsed.version !== CLASSIC_BEST_SCORE_SCHEMA_VERSION
+    ) {
+      return null;
+    }
+
+    if (typeof parsed.score !== "number" || !Number.isFinite(parsed.score)) {
+      return null;
+    }
+
+    return normalizeScoreToTenths(parsed.score);
+  } catch {
+    const fallbackValue = Number.parseFloat(rawValue);
+    return Number.isFinite(fallbackValue)
+      ? normalizeScoreToTenths(fallbackValue)
+      : null;
   }
 }
 
@@ -626,6 +687,19 @@ export function App(): JSX.Element {
   const [totalAnswered, setTotalAnswered] = useState(0);
   const [correctAnswered, setCorrectAnswered] = useState(0);
   const [score, setScore] = useState(0);
+  const [bestClassicScore, setBestClassicScore] = useState<number | null>(
+    () => {
+      try {
+        return parseSavedBestClassicScore(
+          localStorage.getItem(CLASSIC_BEST_SCORE_STORAGE_KEY),
+        );
+      } catch {
+        return null;
+      }
+    },
+  );
+  const [sandboxCurrentStreak, setSandboxCurrentStreak] = useState(0);
+  const [sandboxBestStreak, setSandboxBestStreak] = useState(0);
 
   const [blockInput, setBlockInput] = useState("");
   const [blockInputError, setBlockInputError] = useState<string | null>(null);
@@ -753,6 +827,8 @@ export function App(): JSX.Element {
       totalAnswered,
       correctAnswered,
       score,
+      sandboxCurrentStreak,
+      sandboxBestStreak,
       currentMoveId: currentMove.id,
       remainingMoveIds: playPoolRef.current.map((move) => move.id),
       lastCharacter: lastCharacterRef.current,
@@ -779,6 +855,8 @@ export function App(): JSX.Element {
     totalAnswered,
     correctAnswered,
     score,
+    sandboxCurrentStreak,
+    sandboxBestStreak,
     blockInput,
     commandInput,
   ]);
@@ -831,6 +909,33 @@ export function App(): JSX.Element {
     setSavedProgress(null);
   }
 
+  function syncBestClassicScore(nextScore: number): void {
+    const normalizedScore = normalizeScoreToTenths(nextScore);
+
+    setBestClassicScore((currentBestScore) => {
+      if (currentBestScore !== null && currentBestScore >= normalizedScore) {
+        return currentBestScore;
+      }
+
+      const snapshot: PersistedClassicBestScore = {
+        version: CLASSIC_BEST_SCORE_SCHEMA_VERSION,
+        savedAt: Date.now(),
+        score: normalizedScore,
+      };
+
+      try {
+        localStorage.setItem(
+          CLASSIC_BEST_SCORE_STORAGE_KEY,
+          JSON.stringify(snapshot),
+        );
+      } catch {
+        // Ignore storage errors in private mode.
+      }
+
+      return normalizedScore;
+    });
+  }
+
   function loadSavedProgress(): void {
     if (!savedProgress) {
       return;
@@ -878,6 +983,16 @@ export function App(): JSX.Element {
     setTotalAnswered(savedProgress.totalAnswered);
     setCorrectAnswered(savedProgress.correctAnswered);
     setScore(savedProgress.gameMode === "sandbox" ? 0 : savedProgress.score);
+    setSandboxCurrentStreak(
+      savedProgress.gameMode === "sandbox"
+        ? savedProgress.sandboxCurrentStreak
+        : 0,
+    );
+    setSandboxBestStreak(
+      savedProgress.gameMode === "sandbox"
+        ? savedProgress.sandboxBestStreak
+        : 0,
+    );
     setBlockInput(savedProgress.blockInput);
     setBlockInputError(null);
     setCommandInput(savedProgress.commandInput);
@@ -1034,6 +1149,8 @@ export function App(): JSX.Element {
     setTotalAnswered(0);
     setCorrectAnswered(0);
     setScore(0);
+    setSandboxCurrentStreak(0);
+    setSandboxBestStreak(0);
     setScoreGains([]);
     setCorrectFlashMode(null);
     setSandboxFeedback(null);
@@ -1065,6 +1182,11 @@ export function App(): JSX.Element {
     setFailedMove(null);
     setFailedAnswerMode(null);
     setFailedTypedValue("");
+
+    if (gameMode === "classic") {
+      syncBestClassicScore(score);
+    }
+
     setResultDate(new Date().toLocaleString("ru-RU"));
     setScreen("result");
   }
@@ -1085,6 +1207,10 @@ export function App(): JSX.Element {
       answerType === "block"
         ? (currentMove?.onBlockAnswer ?? "N/A")
         : (currentMove?.command ?? "N/A");
+
+    if (gameMode === "classic") {
+      syncBestClassicScore(score);
+    }
 
     setResultDate(new Date().toLocaleString("ru-RU"));
     setScreen("result");
@@ -1157,7 +1283,13 @@ export function App(): JSX.Element {
       setCorrectAnswered((value) => value + 1);
       setCorrectFlashMode(answerType);
 
-      if (!isSandboxMode) {
+      if (isSandboxMode) {
+        const nextStreak = sandboxCurrentStreak + 1;
+        setSandboxCurrentStreak(nextStreak);
+        setSandboxBestStreak((bestValue) =>
+          nextStreak > bestValue ? nextStreak : bestValue,
+        );
+      } else {
         setScore((value) => value + gained);
         pushScoreGain(gained);
       }
@@ -1169,6 +1301,10 @@ export function App(): JSX.Element {
       }, NEXT_ROUND_DELAY_MS);
 
       return;
+    }
+
+    if (isSandboxMode) {
+      setSandboxCurrentStreak(0);
     }
 
     if (answerType === "block" && currentMove.onBlockAnswer === "N/A") {
@@ -1371,6 +1507,7 @@ export function App(): JSX.Element {
             sandboxFilters={sandboxFilters}
             sandboxFilteredCount={sandboxFilteredMoves.length}
             sandboxTotalCount={sandboxCharacterMoves.length}
+            bestClassicScore={bestClassicScore}
             hasSavedProgress={Boolean(savedProgress)}
             savedProgressLabel={savedProgressLabel}
             onNicknameChange={setNicknameInput}
@@ -1391,6 +1528,8 @@ export function App(): JSX.Element {
               currentRound={currentRound}
               totalRounds={totalRounds}
               score={score}
+              sandboxCurrentStreak={sandboxCurrentStreak}
+              sandboxBestStreak={sandboxBestStreak}
               scoreGains={scoreGains}
               onScoreGainDone={(id) => {
                 setScoreGains((tokens) =>

@@ -10,7 +10,7 @@ import type {
   SandboxThrowFilterMode,
   StartupFilterBand,
 } from "../types";
-import { capitalizeWord } from "../utils";
+import { capitalizeWord, formatScore } from "../utils";
 
 const SORT_OPTIONS: Array<{ value: SandboxSortBy; label: string }> = [
   { value: "random", label: "Случайно" },
@@ -128,6 +128,7 @@ interface StartScreenProps {
   sandboxFilters: SandboxMoveFilters;
   sandboxFilteredCount: number;
   sandboxTotalCount: number;
+  bestClassicScore: number | null;
   hasSavedProgress: boolean;
   savedProgressLabel: string;
   onNicknameChange: (value: string) => void;
@@ -150,6 +151,7 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
     sandboxFilters,
     sandboxFilteredCount,
     sandboxTotalCount,
+    bestClassicScore,
     hasSavedProgress,
     savedProgressLabel,
     onNicknameChange,
@@ -230,6 +232,17 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
               Песочница
             </button>
           </div>
+
+          {!isSandboxMode ? (
+            <p className="best-score-note">
+              Лучший результат в обычном режиме:{" "}
+              <strong>
+                {bestClassicScore === null
+                  ? "-"
+                  : `${formatScore(bestClassicScore)} очк.`}
+              </strong>
+            </p>
+          ) : null}
 
           <div className="start-form">
             <label htmlFor="nicknameInput">Твой ник</label>

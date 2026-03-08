@@ -7,6 +7,8 @@ interface GameTopBarProps {
   currentRound: number;
   totalRounds: number;
   score: number;
+  sandboxCurrentStreak: number;
+  sandboxBestStreak: number;
   scoreGains: ScoreGainToken[];
   onScoreGainDone: (id: string) => void;
 }
@@ -18,12 +20,16 @@ export function GameTopBar(props: GameTopBarProps): JSX.Element {
     currentRound,
     totalRounds,
     score,
+    sandboxCurrentStreak,
+    sandboxBestStreak,
     scoreGains,
     onScoreGainDone,
   } = props;
 
   return (
-    <header className="top-bar reveal">
+    <header
+      className={`top-bar reveal${gameMode === "sandbox" ? " top-bar-sandbox" : ""}`}
+    >
       <div className="player-box">
         Игрок:
         <strong>{nickname || "Игрок"}</strong>
@@ -37,10 +43,16 @@ export function GameTopBar(props: GameTopBarProps): JSX.Element {
       </div>
 
       {gameMode === "sandbox" ? (
-        <div className="score-box">
-          Режим:
-          <strong>Песочница</strong>
-        </div>
+        <>
+          <div className="score-box">
+            Текущий стрик:
+            <strong>{sandboxCurrentStreak}</strong>
+          </div>
+          <div className="score-box">
+            Лучший стрик:
+            <strong>{sandboxBestStreak}</strong>
+          </div>
+        </>
       ) : (
         <div className="score-box points-box">
           Очки:
