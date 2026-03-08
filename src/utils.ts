@@ -185,6 +185,20 @@ export function normalizeFrameToken(value: string): string {
   return text.replace(/\s+/g, "");
 }
 
+function normalizeStrictFrameAnswer(value: string): string | null {
+  const compact = cleanText(value, "").replace(/\s+/g, "");
+  if (!FRAME_INPUT_COMPLETE_PATTERN.test(compact)) {
+    return null;
+  }
+
+  const number = Number.parseInt(compact, 10);
+  if (Number.isNaN(number)) {
+    return null;
+  }
+
+  return number > 0 ? `+${number}` : `${number}`;
+}
+
 export function normalizeCommandStrict(value: string): string {
   return cleanText(value, "")
     .toUpperCase()
@@ -273,6 +287,11 @@ export function mapMoveRecord(record: MovePayloadRecord): MoveRecord | null {
   }
 
   const onBlockRaw = cleanText(record.onBlock ?? record.block, "N/A");
+  const onBlockRawNormalized = normalizeStrictFrameAnswer(onBlockRaw);
+  if (onBlockRawNormalized === null) {
+    return null;
+  }
+
   const onHit = cleanText(record.onHit ?? record.hit, "N/A");
   const onCounter = cleanText(record.onCounter ?? record.counter, "N/A");
   const startup = cleanText(record.startup, "N/A");
@@ -284,7 +303,12 @@ export function mapMoveRecord(record: MovePayloadRecord): MoveRecord | null {
   const answers =
     record.answers && typeof record.answers === "object" ? record.answers : {};
 
-  const onBlockAnswer = normalizeFrameToken(answers.onBlock || onBlockRaw);
+  const onBlockSource = cleanText(answers.onBlock ?? onBlockRawNormalized, "");
+  const onBlockAnswer = normalizeStrictFrameAnswer(onBlockSource);
+  if (onBlockAnswer === null) {
+    return null;
+  }
+
   const commandStrict = normalizeCommandStrict(
     answers.commandStrict || command,
   );
