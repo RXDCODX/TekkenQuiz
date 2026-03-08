@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
 
 const SEMVER_TAG_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)$/;
 
@@ -125,7 +126,7 @@ export default defineConfig({
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
     "import.meta.env.VITE_COMMIT_SHA": JSON.stringify(commitSha),
   },
-  plugins: [react()],
+  plugins: [react(), viteSingleFile()],
   server: {
     host: true,
     port: 5173,
