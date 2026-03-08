@@ -72,7 +72,7 @@ function main() {
     console.log("[deploy] Dry run enabled. Publish step will be skipped.");
   }
 
-  run("npm run build:db");
+  console.log("[deploy] Using existing public/data/moves.json (build:db skipped).");
   run("npm run build", { VITE_BASE_PATH: basePath });
   if (!dryRun) {
     run("npx gh-pages -d dist --dotfiles");
