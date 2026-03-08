@@ -1015,6 +1015,18 @@ export function App(): JSX.Element {
       <div className="grain-layer" aria-hidden="true"></div>
 
       <div className="app-shell">
+        {screen !== "start" ? (
+          <button
+            className="back-menu-button"
+            type="button"
+            onClick={returnToStartScreen}
+            aria-label="Вернуться в главное меню"
+            title="Вернуться в главное меню"
+          >
+            <span aria-hidden="true">&larr;</span>
+          </button>
+        ) : null}
+
         <ThemeSwitcher theme={theme} onThemeChange={setTheme} />
 
         {screen === "start" ? (

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { AnswerMode, GameMode } from "../types";
 
 interface AnswerPanelProps {
@@ -47,6 +48,15 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
   } = props;
 
   const isSandboxMode = gameMode === "sandbox";
+  const sandboxProceedButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isSandboxMode || !sandboxFeedback) {
+      return;
+    }
+
+    sandboxProceedButtonRef.current?.focus();
+  }, [isSandboxMode, sandboxFeedback]);
 
   const blockClass =
     correctFlashMode === "block"
@@ -63,7 +73,7 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
       <h3>Твой ответ</h3>
       <p className="answer-guide">
         {isSandboxMode
-          ? "Песочница: отвечай только фреймдату на блоке. Для грабов фреймдата указывается на разрыве"
+          ? "Песочница: отвечай только фреймдату на блоке. Для грабов фреймдата указывается на разрыве. Если ошибся, нажми «Неправильно, следующий удар»"
           : "Можно ответить только одним способом: либо фреймдата на блоке (+1 балл), либо инпут удара (+0.2 балла). Для грабов фреймдата указывается на разрыве"}
       </p>
 
@@ -94,20 +104,34 @@ export function AnswerPanel(props: AnswerPanelProps): JSX.Element {
       </div>
 
       {isSandboxMode && sandboxFeedback ? (
-        <button
-          className="sandbox-feedback sandbox-feedback-button has-tooltip"
-          type="button"
-          onClick={onSandboxProceed}
-          data-tooltip="Нажми, чтобы перейти к следующему удару"
-          title="Нажми, чтобы перейти к следующему удару"
-          aria-label="Неверно. Нажми, чтобы перейти к следующему удару"
-        >
-          <span className="sandbox-feedback-title">Неверно.</span>
-          <span>Твой ответ:</span>
-          <code>{sandboxFeedback.typedValue}</code>
-          <span>Правильный ответ:</span>
-          <code>{sandboxFeedback.correctValue}</code>
-        </button>
+        <div className="sandbox-feedback" role="status" aria-live="polite">
+          <div className="sandbox-feedback-header">
+            <span className="sandbox-feedback-title">Неправильно.</span>
+            <span className="sandbox-feedback-hint">
+              Нажми кнопку ниже, чтобы перейти к следующему удару.
+            </span>
+          </div>
+
+          <div className="sandbox-feedback-row">
+            <span>Твой ответ:</span>
+            <code>{sandboxFeedback.typedValue}</code>
+          </div>
+
+          <div className="sandbox-feedback-row">
+            <span>Правильный ответ:</span>
+            <code>{sandboxFeedback.correctValue}</code>
+          </div>
+
+          <button
+            ref={sandboxProceedButtonRef}
+            className="sandbox-proceed-button"
+            type="button"
+            onClick={onSandboxProceed}
+            aria-label="Неправильно. Перейти к следующему удару"
+          >
+            Неправильно, следующий удар
+          </button>
+        </div>
       ) : null}
 
       {naFrameFeedback ? (
