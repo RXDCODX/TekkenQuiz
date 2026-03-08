@@ -44,6 +44,8 @@ const SUCCESS_FLASH_CLASS = "success-flash";
 const NEXT_ROUND_DELAY_MS = 900;
 const NA_FRAME_HELP_DELAY_MS = 1700;
 const SCREENSHOT_BG_COLOR = "#0f1d2a";
+const PROGRESS_STORAGE_KEY = "tekken-progress-v1";
+const PROGRESS_SCHEMA_VERSION = 1;
 const APP_VERSION =
   cleanText(import.meta.env.VITE_APP_VERSION, "0.0.0-dev.0+dev").trim() ||
   "0.0.0-dev.0+dev";
@@ -59,6 +61,188 @@ const DEFAULT_SANDBOX_FILTERS: SandboxMoveFilters = {
   states: [],
   throwMode: "all",
 };
+
+interface PersistedGameSnapshot {
+  version: number;
+  savedAt: number;
+  gameMode: GameMode;
+  nickname: string;
+  nicknameInput: string;
+  sandboxCharacter: string;
+  sandboxFilters: SandboxMoveFilters;
+  currentRound: number;
+  totalRounds: number;
+  totalAnswered: number;
+  correctAnswered: number;
+  score: number;
+  currentMoveId: string;
+  remainingMoveIds: string[];
+  lastCharacter: string;
+  blockInput: string;
+  commandInput: string;
+}
+
+function isSandboxSortBy(value: unknown): value is SandboxSortBy {
+  return (
+    value === "random" ||
+    value === "command-asc" ||
+    value === "command-desc" ||
+    value === "startup-asc" ||
+    value === "startup-desc" ||
+    value === "block-asc" ||
+    value === "block-desc" ||
+    value === "hit-asc" ||
+    value === "hit-desc" ||
+    value === "hitLevel-asc" ||
+    value === "hitLevel-desc" ||
+    value === "damage-asc" ||
+    value === "damage-desc"
+  );
+}
+
+function sanitizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function sanitizeSandboxFilters(rawValue: unknown): SandboxMoveFilters {
+  if (!rawValue || typeof rawValue !== "object") {
+    return {
+      ...DEFAULT_SANDBOX_FILTERS,
+      onBlockBands: [],
+      onHitBands: [],
+      startup: [],
+      hitLevels: [],
+      properties: [],
+      states: [],
+    };
+  }
+
+  const value = rawValue as Partial<SandboxMoveFilters>;
+
+  return {
+    sortBy: isSandboxSortBy(value.sortBy)
+      ? value.sortBy
+      : DEFAULT_SANDBOX_FILTERS.sortBy,
+    onBlockBands: sanitizeStringArray(
+      value.onBlockBands,
+    ) as SandboxMoveFilters["onBlockBands"],
+    onHitBands: sanitizeStringArray(
+      value.onHitBands,
+    ) as SandboxMoveFilters["onHitBands"],
+    startup: sanitizeStringArray(
+      value.startup,
+    ) as SandboxMoveFilters["startup"],
+    hitLevels: sanitizeStringArray(
+      value.hitLevels,
+    ) as SandboxMoveFilters["hitLevels"],
+    properties: sanitizeStringArray(
+      value.properties,
+    ) as SandboxMoveFilters["properties"],
+    states: sanitizeStringArray(value.states) as SandboxMoveFilters["states"],
+    throwMode:
+      value.throwMode === "only" || value.throwMode === "exclude"
+        ? value.throwMode
+        : "all",
+  };
+}
+
+function normalizeNonNegativeNumber(value: unknown, fallback = 0): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(0, value);
+}
+
+function parseSavedProgress(
+  rawValue: string | null,
+): PersistedGameSnapshot | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<PersistedGameSnapshot>;
+
+    if (parsed.version !== PROGRESS_SCHEMA_VERSION) {
+      return null;
+    }
+
+    if (parsed.gameMode !== "classic" && parsed.gameMode !== "sandbox") {
+      return null;
+    }
+
+    if (typeof parsed.currentMoveId !== "string" || !parsed.currentMoveId) {
+      return null;
+    }
+
+    if (!Array.isArray(parsed.remainingMoveIds)) {
+      return null;
+    }
+
+    const savedAt = normalizeNonNegativeNumber(parsed.savedAt, Date.now());
+    const currentRound = Math.max(
+      1,
+      Math.floor(normalizeNonNegativeNumber(parsed.currentRound, 1)),
+    );
+    const totalRounds = Math.max(
+      currentRound,
+      Math.floor(normalizeNonNegativeNumber(parsed.totalRounds, currentRound)),
+    );
+
+    return {
+      version: PROGRESS_SCHEMA_VERSION,
+      savedAt,
+      gameMode: parsed.gameMode,
+      nickname:
+        typeof parsed.nickname === "string" && parsed.nickname.trim()
+          ? parsed.nickname
+          : "Игрок",
+      nicknameInput:
+        typeof parsed.nicknameInput === "string"
+          ? parsed.nicknameInput
+          : typeof parsed.nickname === "string"
+            ? parsed.nickname
+            : "",
+      sandboxCharacter:
+        typeof parsed.sandboxCharacter === "string"
+          ? parsed.sandboxCharacter
+          : "",
+      sandboxFilters: sanitizeSandboxFilters(parsed.sandboxFilters),
+      currentRound,
+      totalRounds,
+      totalAnswered: Math.floor(
+        normalizeNonNegativeNumber(parsed.totalAnswered),
+      ),
+      correctAnswered: Math.floor(
+        normalizeNonNegativeNumber(parsed.correctAnswered),
+      ),
+      score: normalizeNonNegativeNumber(parsed.score),
+      currentMoveId: parsed.currentMoveId,
+      remainingMoveIds: sanitizeStringArray(parsed.remainingMoveIds),
+      lastCharacter:
+        typeof parsed.lastCharacter === "string" ? parsed.lastCharacter : "",
+      blockInput:
+        typeof parsed.blockInput === "string" ? parsed.blockInput : "",
+      commandInput:
+        typeof parsed.commandInput === "string" ? parsed.commandInput : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatSavedProgressLabel(snapshot: PersistedGameSnapshot): string {
+  const modeLabel = snapshot.gameMode === "sandbox" ? "Песочница" : "Обычный";
+  const roundLabel = `${snapshot.currentRound}/${snapshot.totalRounds}`;
+  const timeLabel = new Date(snapshot.savedAt).toLocaleString("ru-RU");
+
+  return `${modeLabel}, раунд ${roundLabel}, ${timeLabel}`;
+}
 
 function tokenizeLooseText(value: string): Set<string> {
   const normalized = String(value)
@@ -467,6 +651,8 @@ export function App(): JSX.Element {
     null,
   );
   const [failedTypedValue, setFailedTypedValue] = useState("");
+  const [savedProgress, setSavedProgress] =
+    useState<PersistedGameSnapshot | null>(null);
 
   const playPoolRef = useRef<MoveRecord[]>([]);
   const lastCharacterRef = useRef("");
@@ -486,6 +672,10 @@ export function App(): JSX.Element {
   }, [moves]);
 
   const isSandboxMode = gameMode === "sandbox";
+  const savedProgressLabel = useMemo(
+    () => (savedProgress ? formatSavedProgressLabel(savedProgress) : ""),
+    [savedProgress],
+  );
 
   const sandboxCharacterMoves = useMemo(() => {
     if (!sandboxCharacter) {
@@ -535,6 +725,64 @@ export function App(): JSX.Element {
     });
   }, [characterOptions]);
 
+  useEffect(() => {
+    try {
+      setSavedProgress(
+        parseSavedProgress(localStorage.getItem(PROGRESS_STORAGE_KEY)),
+      );
+    } catch {
+      setSavedProgress(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "game" || !currentMove || roundLockedRef.current) {
+      return;
+    }
+
+    const snapshot: PersistedGameSnapshot = {
+      version: PROGRESS_SCHEMA_VERSION,
+      savedAt: Date.now(),
+      gameMode,
+      nickname,
+      nicknameInput,
+      sandboxCharacter,
+      sandboxFilters,
+      currentRound,
+      totalRounds,
+      totalAnswered,
+      correctAnswered,
+      score,
+      currentMoveId: currentMove.id,
+      remainingMoveIds: playPoolRef.current.map((move) => move.id),
+      lastCharacter: lastCharacterRef.current,
+      blockInput,
+      commandInput,
+    };
+
+    try {
+      localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(snapshot));
+      setSavedProgress(snapshot);
+    } catch {
+      // Ignore storage errors in private mode.
+    }
+  }, [
+    screen,
+    currentMove,
+    gameMode,
+    nickname,
+    nicknameInput,
+    sandboxCharacter,
+    sandboxFilters,
+    currentRound,
+    totalRounds,
+    totalAnswered,
+    correctAnswered,
+    score,
+    blockInput,
+    commandInput,
+  ]);
+
   async function loadDatabase(): Promise<void> {
     setLoadingStatus("Загружаю базу ударов...");
 
@@ -571,6 +819,86 @@ export function App(): JSX.Element {
       setCanStart(false);
       console.error(error);
     }
+  }
+
+  function clearSavedProgress(): void {
+    try {
+      localStorage.removeItem(PROGRESS_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors in private mode.
+    }
+
+    setSavedProgress(null);
+  }
+
+  function loadSavedProgress(): void {
+    if (!savedProgress) {
+      return;
+    }
+
+    if (moves.length === 0) {
+      setLoadingStatus("Сначала дождись загрузки базы ударов.");
+      return;
+    }
+
+    const moveById = new Map(moves.map((move) => [move.id, move]));
+    const restoredCurrentMove = moveById.get(savedProgress.currentMoveId);
+
+    if (!restoredCurrentMove) {
+      clearSavedProgress();
+      setLoadingStatus("Сохранение устарело и было удалено. Начни новую игру.");
+      return;
+    }
+
+    const restoredPool = savedProgress.remainingMoveIds
+      .map((id) => moveById.get(id))
+      .filter((move): move is MoveRecord => move !== undefined);
+
+    if (restoredPool.length !== savedProgress.remainingMoveIds.length) {
+      clearSavedProgress();
+      setLoadingStatus(
+        "Сохранение не совпадает с текущей базой и было удалено.",
+      );
+      return;
+    }
+
+    clearTimers();
+    setGameMode(savedProgress.gameMode);
+    setNickname(cleanText(savedProgress.nickname, "Игрок"));
+    setNicknameInput(savedProgress.nicknameInput || savedProgress.nickname);
+    setSandboxCharacter(savedProgress.sandboxCharacter);
+    setSandboxFilters(savedProgress.sandboxFilters);
+    setCurrentRound(savedProgress.currentRound);
+    setTotalRounds(
+      Math.max(
+        savedProgress.totalRounds,
+        savedProgress.currentRound + restoredPool.length,
+      ),
+    );
+    setTotalAnswered(savedProgress.totalAnswered);
+    setCorrectAnswered(savedProgress.correctAnswered);
+    setScore(savedProgress.gameMode === "sandbox" ? 0 : savedProgress.score);
+    setBlockInput(savedProgress.blockInput);
+    setBlockInputError(null);
+    setCommandInput(savedProgress.commandInput);
+    setVideoError(false);
+    setScoreGains([]);
+    setCorrectFlashMode(null);
+    setSandboxFeedback(null);
+    setNaFrameFeedback(null);
+    setDevAnswerVisible(false);
+    setResultDate("-");
+    setFailedMove(null);
+    setFailedAnswerMode(null);
+    setFailedTypedValue("");
+
+    playPoolRef.current = restoredPool;
+    lastCharacterRef.current =
+      savedProgress.lastCharacter || restoredCurrentMove.character;
+    roundLockedRef.current = false;
+
+    setCurrentMove(restoredCurrentMove);
+    setScreen("game");
   }
 
   function clearTimers(): void {
@@ -697,6 +1025,7 @@ export function App(): JSX.Element {
     }
 
     clearTimers();
+    clearSavedProgress();
 
     setNickname(cleanText(nicknameInput, "Игрок"));
     setCurrentMove(null);
@@ -729,6 +1058,7 @@ export function App(): JSX.Element {
 
   function finishByCompletion(): void {
     clearTimers();
+    clearSavedProgress();
     roundLockedRef.current = true;
     setSandboxFeedback(null);
     setNaFrameFeedback(null);
@@ -744,6 +1074,7 @@ export function App(): JSX.Element {
     typedValue: string,
   ): void {
     clearTimers();
+    clearSavedProgress();
     roundLockedRef.current = true;
     playErrorSound();
     setFailedMove(currentMove);
@@ -1040,11 +1371,15 @@ export function App(): JSX.Element {
             sandboxFilters={sandboxFilters}
             sandboxFilteredCount={sandboxFilteredMoves.length}
             sandboxTotalCount={sandboxCharacterMoves.length}
+            hasSavedProgress={Boolean(savedProgress)}
+            savedProgressLabel={savedProgressLabel}
             onNicknameChange={setNicknameInput}
             onModeChange={handleModeChange}
             onSandboxCharacterChange={setSandboxCharacter}
             onSandboxFiltersChange={setSandboxFilters}
             onStart={startGame}
+            onLoadSavedProgress={loadSavedProgress}
+            onClearSavedProgress={clearSavedProgress}
           />
         ) : null}
 

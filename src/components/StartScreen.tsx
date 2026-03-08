@@ -128,11 +128,15 @@ interface StartScreenProps {
   sandboxFilters: SandboxMoveFilters;
   sandboxFilteredCount: number;
   sandboxTotalCount: number;
+  hasSavedProgress: boolean;
+  savedProgressLabel: string;
   onNicknameChange: (value: string) => void;
   onModeChange: (value: GameMode) => void;
   onSandboxCharacterChange: (value: string) => void;
   onSandboxFiltersChange: (value: SandboxMoveFilters) => void;
   onStart: () => void;
+  onLoadSavedProgress: () => void;
+  onClearSavedProgress: () => void;
 }
 
 export function StartScreen(props: StartScreenProps): JSX.Element {
@@ -146,11 +150,15 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
     sandboxFilters,
     sandboxFilteredCount,
     sandboxTotalCount,
+    hasSavedProgress,
+    savedProgressLabel,
     onNicknameChange,
     onModeChange,
     onSandboxCharacterChange,
     onSandboxFiltersChange,
     onStart,
+    onLoadSavedProgress,
+    onClearSavedProgress,
   } = props;
 
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -285,6 +293,29 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
             >
               {isSandboxMode ? "Начать песочницу" : "Начать игру"}
             </button>
+
+            {hasSavedProgress ? (
+              <div className="save-progress-box">
+                <p className="save-progress-title">Найдено автосохранение</p>
+                <p className="save-progress-meta">{savedProgressLabel}</p>
+                <div className="save-progress-actions">
+                  <button
+                    className="cta-button save-load-button"
+                    type="button"
+                    onClick={onLoadSavedProgress}
+                  >
+                    Загрузить сохранение
+                  </button>
+                  <button
+                    className="save-clear-button"
+                    type="button"
+                    onClick={onClearSavedProgress}
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <p className="loading-status">{loadingStatus}</p>
