@@ -4,6 +4,7 @@ interface VideoPanelProps {
   characterName: string;
   videoUrl: string;
   videoError: boolean;
+  videoCdnHosts: string[];
   onVideoLoaded: () => void;
   onVideoError: () => void;
   children: ReactNode;
@@ -14,10 +15,16 @@ export function VideoPanel(props: VideoPanelProps): JSX.Element {
     characterName,
     videoUrl,
     videoError,
+    videoCdnHosts,
     onVideoLoaded,
     onVideoError,
     children,
   } = props;
+
+  const domainsText =
+    videoCdnHosts.length > 0
+      ? videoCdnHosts.join(", ")
+      : "домены CDN в базе не определены";
 
   return (
     <article className="panel video-panel reveal delay-1">
@@ -40,8 +47,13 @@ export function VideoPanel(props: VideoPanelProps): JSX.Element {
           onError={onVideoError}
         />
         {videoError ? (
-          <div className="video-fallback">
-            Видео недоступно, перехожу к следующему удару...
+          <div className="video-fallback" role="status" aria-live="polite">
+            <p className="video-fallback-title">Видео не загрузилось.</p>
+            <p className="video-fallback-copy">
+              Проверь доступность CDN-доменов и при необходимости добавь их в
+              zapret:
+            </p>
+            <p className="video-fallback-domains">{domainsText}</p>
           </div>
         ) : null}
       </div>

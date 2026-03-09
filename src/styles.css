@@ -771,11 +771,37 @@ input.input-invalid,
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: 0.46rem;
   text-align: center;
   color: var(--muted);
-  padding: 1rem;
+  padding: 1rem 1.2rem;
   background: var(--video-fallback-bg);
+}
+
+.video-fallback-title,
+.video-fallback-copy,
+.video-fallback-domains {
+  margin: 0;
+}
+
+.video-fallback-title {
+  color: var(--text);
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  font-weight: 800;
+}
+
+.video-fallback-copy {
+  max-width: 48ch;
+  line-height: 1.35;
+}
+
+.video-fallback-domains {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  font-size: 0.93rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .answer-panel-inner {

@@ -30,6 +30,7 @@ import {
   compareFrameAnswer,
   extractDamageNumber,
   extractFrameNumber,
+  extractUrlHost,
   isFrameInputComplete,
   mapMoveRecord,
   playErrorSound,
@@ -743,6 +744,19 @@ export function App(): JSX.Element {
     }
 
     return [...characters].sort((left, right) => left.localeCompare(right));
+  }, [moves]);
+
+  const videoCdnHosts = useMemo(() => {
+    const hosts = new Set<string>();
+
+    for (const move of moves) {
+      const host = extractUrlHost(move.videoUrl);
+      if (host) {
+        hosts.add(host);
+      }
+    }
+
+    return [...hosts].sort((left, right) => left.localeCompare(right));
   }, [moves]);
 
   const isSandboxMode = gameMode === "sandbox";
@@ -1543,6 +1557,7 @@ export function App(): JSX.Element {
                 characterName={capitalizeWord(currentMove?.character ?? "")}
                 videoUrl={currentMove?.videoUrl ?? ""}
                 videoError={videoError}
+                videoCdnHosts={videoCdnHosts}
                 onVideoLoaded={handleVideoLoaded}
                 onVideoError={handleVideoError}
               >

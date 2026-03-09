@@ -105,6 +105,27 @@ export function cleanText(value: unknown, fallback = ""): string {
   return text.length > 0 ? text : fallback;
 }
 
+export function extractUrlHost(value: string): string | null {
+  const text = cleanText(value, "");
+  if (!text) {
+    return null;
+  }
+
+  const hasScheme = /^[a-z][a-z\d+.-]*:/i.test(text);
+  const baseOrigin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://localhost";
+
+  try {
+    const parsed = hasScheme ? new URL(text) : new URL(text, baseOrigin);
+    const host = cleanText(parsed.hostname, "").toLowerCase();
+    return host || null;
+  } catch {
+    return null;
+  }
+}
+
 export function extractFrameNumber(value: string): number | null {
   const match = String(value).match(/[-+]?\d+/);
   if (!match) {
