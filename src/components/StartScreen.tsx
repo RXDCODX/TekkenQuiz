@@ -1,6 +1,13 @@
 import { useState } from "react";
+import {
+  formatFrameTolerance,
+  formatMistakeLimit,
+  GAME_DIFFICULTY_ORDER,
+  GAME_DIFFICULTY_RULES,
+} from "../difficulty";
 import type {
   FrameBand,
+  GameDifficulty,
   GameMode,
   SandboxHitLevelFilter,
   SandboxMoveFilters,
@@ -123,6 +130,7 @@ interface StartScreenProps {
   loadingStatus: string;
   canStart: boolean;
   mode: GameMode;
+  difficulty: GameDifficulty;
   characterOptions: string[];
   sandboxCharacter: string;
   sandboxFilters: SandboxMoveFilters;
@@ -133,6 +141,7 @@ interface StartScreenProps {
   savedProgressLabel: string;
   onNicknameChange: (value: string) => void;
   onModeChange: (value: GameMode) => void;
+  onDifficultyChange: (value: GameDifficulty) => void;
   onSandboxCharacterChange: (value: string) => void;
   onSandboxFiltersChange: (value: SandboxMoveFilters) => void;
   onStart: () => void;
@@ -146,6 +155,7 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
     loadingStatus,
     canStart,
     mode,
+    difficulty,
     characterOptions,
     sandboxCharacter,
     sandboxFilters,
@@ -156,6 +166,7 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
     savedProgressLabel,
     onNicknameChange,
     onModeChange,
+    onDifficultyChange,
     onSandboxCharacterChange,
     onSandboxFiltersChange,
     onStart,
@@ -166,6 +177,7 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
   const [filtersVisible, setFiltersVisible] = useState(false);
 
   const isSandboxMode = mode === "sandbox";
+  const classicDifficultyRules = GAME_DIFFICULTY_RULES[difficulty];
   const hasSandboxMoves = sandboxFilteredCount > 0;
   const canStartSession =
     canStart &&
@@ -191,6 +203,47 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
   return (
     <section className="screen start-screen">
       <div className="start-panels">
+        {!isSandboxMode ? (
+          <aside className="panel difficulty-side-panel reveal delay-1">
+            <p className="difficulty-card-title">Сложность</p>
+            <p className="difficulty-card-copy">
+              Выбери лимит ошибок и допуск по фреймдате.
+            </p>
+
+            <div
+              className="difficulty-option-list"
+              role="radiogroup"
+              aria-label="Сложность игры"
+            >
+              {GAME_DIFFICULTY_ORDER.map((difficultyValue) => {
+                const rules = GAME_DIFFICULTY_RULES[difficultyValue];
+                const isActive = difficultyValue === difficulty;
+
+                return (
+                  <button
+                    key={difficultyValue}
+                    type="button"
+                    className={`difficulty-option difficulty-${difficultyValue}${isActive ? " active" : ""}`}
+                    onClick={() => onDifficultyChange(difficultyValue)}
+                    role="radio"
+                    aria-checked={isActive}
+                  >
+                    <span className="difficulty-option-name">
+                      {rules.label}
+                    </span>
+                    <span className="difficulty-option-meta">
+                      {formatMistakeLimit(rules.maxMistakes)}
+                    </span>
+                    <span className="difficulty-option-meta">
+                      {formatFrameTolerance(rules.frameTolerance)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+        ) : null}
+
         <div className="panel intro-panel reveal start-main-panel">
           <p className="eyebrow">Tekken Move Trainer</p>
           <h1>
@@ -208,8 +261,15 @@ export function StartScreen(props: StartScreenProps): JSX.Element {
             ) : (
               <>
                 Смотри удар, отвечай на <strong>фреймдату на блоке</strong> (+1
-                балл) или на <strong>инпут удара</strong> (+0.2 балла). Ошибся
-                один раз - игра окончена.
+                балл) или на <strong>инпут удара</strong> (+0.2 балла).
+                Сложность
+                <strong
+                  className={`difficulty-inline difficulty-${difficulty}`}
+                >
+                  {` ${classicDifficultyRules.label.toLowerCase()}`}
+                </strong>
+                :{" "}
+                {`${formatMistakeLimit(classicDifficultyRules.maxMistakes).toLowerCase()}, ${formatFrameTolerance(classicDifficultyRules.frameTolerance).toLowerCase()}.`}
               </>
             )}
           </p>

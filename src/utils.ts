@@ -234,6 +234,7 @@ export function normalizeCommandLoose(value: string): string {
 export function compareFrameAnswer(
   userValue: string,
   correctValue: string,
+  toleranceFrames = 0,
 ): boolean {
   const userNormalized = normalizeFrameToken(userValue);
   const correctNormalized = normalizeFrameToken(correctValue);
@@ -242,7 +243,8 @@ export function compareFrameAnswer(
   const correctNumber = extractFrameNumber(correctNormalized);
 
   if (userNumber !== null && correctNumber !== null) {
-    return userNumber === correctNumber;
+    const safeTolerance = Math.max(0, toleranceFrames);
+    return Math.abs(userNumber - correctNumber) <= safeTolerance;
   }
 
   return userNormalized === correctNormalized;

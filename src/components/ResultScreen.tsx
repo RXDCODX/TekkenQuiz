@@ -1,9 +1,16 @@
 import type { RefObject } from "react";
-import type { AnswerMode, GameMode, MoveRecord } from "../types";
+import { GAME_DIFFICULTY_RULES } from "../difficulty";
+import type {
+  AnswerMode,
+  GameDifficulty,
+  GameMode,
+  MoveRecord,
+} from "../types";
 import { capitalizeWord, formatScore } from "../utils";
 
 interface ResultScreenProps {
   gameMode: GameMode;
+  gameDifficulty: GameDifficulty;
   nickname: string;
   correctAnswered: number;
   totalAnswered: number;
@@ -20,6 +27,7 @@ interface ResultScreenProps {
 export function ResultScreen(props: ResultScreenProps): JSX.Element {
   const {
     gameMode,
+    gameDifficulty,
     nickname,
     correctAnswered,
     totalAnswered,
@@ -34,6 +42,7 @@ export function ResultScreen(props: ResultScreenProps): JSX.Element {
   } = props;
 
   const isSandboxMode = gameMode === "sandbox";
+  const difficultyLabel = GAME_DIFFICULTY_RULES[gameDifficulty].label;
 
   return (
     <section className="screen">
@@ -56,6 +65,16 @@ export function ResultScreen(props: ResultScreenProps): JSX.Element {
             <div className="result-item">
               <span>Очки</span>
               <strong>{formatScore(score)}</strong>
+            </div>
+          ) : null}
+          {!isSandboxMode ? (
+            <div className="result-item">
+              <span>Сложность</span>
+              <strong
+                className={`difficulty-pill difficulty-${gameDifficulty}`}
+              >
+                {difficultyLabel}
+              </strong>
             </div>
           ) : null}
           <div className="result-item">

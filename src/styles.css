@@ -11,6 +11,10 @@
   --accent-strong: #1da07a;
   --alt: #ff9f4f;
   --danger: #ff4d63;
+  --difficulty-easy: #5cd790;
+  --difficulty-medium: #5ca8ff;
+  --difficulty-hard: #ffb35d;
+  --difficulty-hardcore: #ff5f66;
   --check-btn-0: #8f4f23;
   --check-btn-1: #653815;
   --theme-chip: rgba(9, 21, 33, 0.82);
@@ -37,6 +41,10 @@ body[data-theme="light"] {
   --accent-strong: #16785a;
   --alt: #d97b2f;
   --danger: #c4374c;
+  --difficulty-easy: #1e9a5b;
+  --difficulty-medium: #2c73c2;
+  --difficulty-hard: #bc6f23;
+  --difficulty-hardcore: #b52f3c;
   --check-btn-0: #91522a;
   --check-btn-1: #704022;
   --theme-chip: rgba(232, 243, 253, 0.88);
@@ -351,6 +359,124 @@ h1 {
 .start-main-panel {
   position: relative;
   z-index: 3;
+}
+
+.difficulty-side-panel {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 14px);
+  width: min(310px, calc(100vw - 2rem));
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.62rem;
+  z-index: 2;
+}
+
+.difficulty-card-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.difficulty-card-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.difficulty-option-list {
+  display: grid;
+  gap: 0.46rem;
+}
+
+.difficulty-option {
+  --difficulty-color: var(--line);
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-strong) 76%, transparent);
+  color: var(--muted);
+  text-align: left;
+  padding: 0.6rem 0.66rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.16rem;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.difficulty-option:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--difficulty-color) 54%, var(--line));
+}
+
+.difficulty-option:active {
+  transform: translateY(1px);
+}
+
+.difficulty-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--difficulty-color) 55%, white 45%);
+  outline-offset: 2px;
+}
+
+.difficulty-option.active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--difficulty-color) 76%, var(--line));
+  background: color-mix(in srgb, var(--difficulty-color) 16%, var(--panel-strong));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--difficulty-color) 34%, transparent);
+}
+
+.difficulty-option-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.difficulty-option-meta {
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.difficulty-easy {
+  --difficulty-color: var(--difficulty-easy);
+}
+
+.difficulty-medium {
+  --difficulty-color: var(--difficulty-medium);
+}
+
+.difficulty-hard {
+  --difficulty-color: var(--difficulty-hard);
+}
+
+.difficulty-hardcore {
+  --difficulty-color: var(--difficulty-hardcore);
+}
+
+.difficulty-inline {
+  margin-left: 0.12rem;
+  font-weight: 900;
+}
+
+.difficulty-inline.difficulty-easy {
+  color: var(--difficulty-easy);
+}
+
+.difficulty-inline.difficulty-medium {
+  color: var(--difficulty-medium);
+}
+
+.difficulty-inline.difficulty-hard {
+  color: var(--difficulty-hard);
+}
+
+.difficulty-inline.difficulty-hardcore {
+  color: var(--difficulty-hardcore);
 }
 
 .sandbox-filter-toggle-row {
@@ -675,7 +801,7 @@ input.input-invalid,
 
 .top-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
 }
 
@@ -706,6 +832,17 @@ input.input-invalid,
 
 .points-box strong {
   color: var(--accent);
+}
+
+.difficulty-box strong {
+  color: var(--difficulty-color, var(--text));
+}
+
+.classic-mistake-hint {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .score-gain-layer {
@@ -1028,6 +1165,16 @@ input.input-invalid,
   font-size: 1.15rem;
 }
 
+.difficulty-pill {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--difficulty-color) 66%, var(--line));
+  border-radius: 999px;
+  padding: 0.14rem 0.56rem;
+  color: var(--difficulty-color);
+  background: color-mix(in srgb, var(--difficulty-color) 12%, transparent);
+}
+
 .result-loss-review {
   margin-top: 1rem;
   padding: 0.95rem;
@@ -1260,6 +1407,14 @@ body.screenshot-mode .delay-2 {
 }
 
 @media (max-width: 1180px) {
+  .difficulty-side-panel {
+    position: relative;
+    top: 0;
+    right: 0;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+
   .sandbox-side-panel {
     position: relative;
     top: 0;
@@ -1328,6 +1483,7 @@ body.screenshot-mode .delay-2 {
   }
 
   .intro-panel,
+  .difficulty-side-panel,
   .sandbox-side-panel.open,
   .video-panel,
   .result-panel {

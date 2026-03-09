@@ -2,6 +2,8 @@ export type AnswerMode = "block" | "command";
 
 export type GameMode = "classic" | "sandbox";
 
+export type GameDifficulty = "easy" | "medium" | "hard" | "hardcore";
+
 export type ScreenMode = "start" | "game" | "result";
 
 export type SandboxSortBy =

@@ -7,8 +7,14 @@ import { ResultScreen } from "./components/ResultScreen";
 import { StartScreen } from "./components/StartScreen";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VideoPanel } from "./components/VideoPanel";
+import {
+  DEFAULT_GAME_DIFFICULTY,
+  GAME_DIFFICULTY_RULES,
+  isGameDifficulty,
+} from "./difficulty";
 import type {
   AnswerMode,
+  GameDifficulty,
   GameMode,
   MovePayloadObject,
   MovePayloadRecord,
@@ -69,6 +75,7 @@ interface PersistedGameSnapshot {
   version: number;
   savedAt: number;
   gameMode: GameMode;
+  gameDifficulty: GameDifficulty;
   nickname: string;
   nicknameInput: string;
   sandboxCharacter: string;
@@ -78,6 +85,7 @@ interface PersistedGameSnapshot {
   totalAnswered: number;
   correctAnswered: number;
   score: number;
+  classicMistakes: number;
   sandboxCurrentStreak: number;
   sandboxBestStreak: number;
   currentMoveId: string;
@@ -200,6 +208,9 @@ function parseSavedProgress(
     }
 
     const savedAt = normalizeNonNegativeNumber(parsed.savedAt, Date.now());
+    const gameDifficulty = isGameDifficulty(parsed.gameDifficulty)
+      ? parsed.gameDifficulty
+      : DEFAULT_GAME_DIFFICULTY;
     const currentRound = Math.max(
       1,
       Math.floor(normalizeNonNegativeNumber(parsed.currentRound, 1)),
@@ -211,6 +222,9 @@ function parseSavedProgress(
     const sandboxCurrentStreak = Math.floor(
       normalizeNonNegativeNumber(parsed.sandboxCurrentStreak),
     );
+    const classicMistakes = Math.floor(
+      normalizeNonNegativeNumber(parsed.classicMistakes),
+    );
     const sandboxBestStreak = Math.max(
       sandboxCurrentStreak,
       Math.floor(normalizeNonNegativeNumber(parsed.sandboxBestStreak)),
@@ -220,6 +234,7 @@ function parseSavedProgress(
       version: PROGRESS_SCHEMA_VERSION,
       savedAt,
       gameMode: parsed.gameMode,
+      gameDifficulty,
       nickname:
         typeof parsed.nickname === "string" && parsed.nickname.trim()
           ? parsed.nickname
@@ -244,6 +259,7 @@ function parseSavedProgress(
         normalizeNonNegativeNumber(parsed.correctAnswered),
       ),
       score: normalizeNonNegativeNumber(parsed.score),
+      classicMistakes,
       sandboxCurrentStreak,
       sandboxBestStreak,
       currentMoveId: parsed.currentMoveId,
@@ -300,10 +316,14 @@ function parseSavedBestClassicScore(rawValue: string | null): number | null {
 
 function formatSavedProgressLabel(snapshot: PersistedGameSnapshot): string {
   const modeLabel = snapshot.gameMode === "sandbox" ? "Песочница" : "Обычный";
+  const difficultyLabel =
+    snapshot.gameMode === "classic"
+      ? `, ${GAME_DIFFICULTY_RULES[snapshot.gameDifficulty].label}`
+      : "";
   const roundLabel = `${snapshot.currentRound}/${snapshot.totalRounds}`;
   const timeLabel = new Date(snapshot.savedAt).toLocaleString("ru-RU");
 
-  return `${modeLabel}, раунд ${roundLabel}, ${timeLabel}`;
+  return `${modeLabel}${difficultyLabel}, раунд ${roundLabel}, ${timeLabel}`;
 }
 
 function tokenizeLooseText(value: string): Set<string> {
@@ -678,6 +698,9 @@ export function App(): JSX.Element {
   const [loadingStatus, setLoadingStatus] = useState("Загружаю базу ударов...");
   const [canStart, setCanStart] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>("classic");
+  const [gameDifficulty, setGameDifficulty] = useState<GameDifficulty>(
+    DEFAULT_GAME_DIFFICULTY,
+  );
   const [sandboxCharacter, setSandboxCharacter] = useState("");
   const [sandboxFilters, setSandboxFilters] = useState<SandboxMoveFilters>(
     DEFAULT_SANDBOX_FILTERS,
@@ -688,6 +711,7 @@ export function App(): JSX.Element {
   const [totalAnswered, setTotalAnswered] = useState(0);
   const [correctAnswered, setCorrectAnswered] = useState(0);
   const [score, setScore] = useState(0);
+  const [classicMistakes, setClassicMistakes] = useState(0);
   const [bestClassicScore, setBestClassicScore] = useState<number | null>(
     () => {
       try {
@@ -760,6 +784,7 @@ export function App(): JSX.Element {
   }, [moves]);
 
   const isSandboxMode = gameMode === "sandbox";
+  const classicDifficultyRules = GAME_DIFFICULTY_RULES[gameDifficulty];
   const savedProgressLabel = useMemo(
     () => (savedProgress ? formatSavedProgressLabel(savedProgress) : ""),
     [savedProgress],
@@ -832,6 +857,7 @@ export function App(): JSX.Element {
       version: PROGRESS_SCHEMA_VERSION,
       savedAt: Date.now(),
       gameMode,
+      gameDifficulty,
       nickname,
       nicknameInput,
       sandboxCharacter,
@@ -841,6 +867,7 @@ export function App(): JSX.Element {
       totalAnswered,
       correctAnswered,
       score,
+      classicMistakes,
       sandboxCurrentStreak,
       sandboxBestStreak,
       currentMoveId: currentMove.id,
@@ -860,6 +887,7 @@ export function App(): JSX.Element {
     screen,
     currentMove,
     gameMode,
+    gameDifficulty,
     nickname,
     nicknameInput,
     sandboxCharacter,
@@ -869,6 +897,7 @@ export function App(): JSX.Element {
     totalAnswered,
     correctAnswered,
     score,
+    classicMistakes,
     sandboxCurrentStreak,
     sandboxBestStreak,
     blockInput,
@@ -983,6 +1012,7 @@ export function App(): JSX.Element {
 
     clearTimers();
     setGameMode(savedProgress.gameMode);
+    setGameDifficulty(savedProgress.gameDifficulty);
     setNickname(cleanText(savedProgress.nickname, "Игрок"));
     setNicknameInput(savedProgress.nicknameInput || savedProgress.nickname);
     setSandboxCharacter(savedProgress.sandboxCharacter);
@@ -997,6 +1027,9 @@ export function App(): JSX.Element {
     setTotalAnswered(savedProgress.totalAnswered);
     setCorrectAnswered(savedProgress.correctAnswered);
     setScore(savedProgress.gameMode === "sandbox" ? 0 : savedProgress.score);
+    setClassicMistakes(
+      savedProgress.gameMode === "classic" ? savedProgress.classicMistakes : 0,
+    );
     setSandboxCurrentStreak(
       savedProgress.gameMode === "sandbox"
         ? savedProgress.sandboxCurrentStreak
@@ -1163,6 +1196,7 @@ export function App(): JSX.Element {
     setTotalAnswered(0);
     setCorrectAnswered(0);
     setScore(0);
+    setClassicMistakes(0);
     setSandboxCurrentStreak(0);
     setSandboxBestStreak(0);
     setScoreGains([]);
@@ -1283,7 +1317,11 @@ export function App(): JSX.Element {
 
     const answerIsCorrect =
       answerType === "block"
-        ? compareFrameAnswer(typedValue, currentMove.onBlockAnswer)
+        ? compareFrameAnswer(
+            typedValue,
+            currentMove.onBlockAnswer,
+            isSandboxMode ? 0 : classicDifficultyRules.frameTolerance,
+          )
         : compareCommandAnswer(
             typedValue,
             currentMove.commandStrict,
@@ -1343,7 +1381,18 @@ export function App(): JSX.Element {
       return;
     }
 
-    finishWithWrongAnswer(answerType, typedValue);
+    const nextMistakes = classicMistakes + 1;
+    setClassicMistakes(nextMistakes);
+
+    if (nextMistakes > classicDifficultyRules.maxMistakes) {
+      finishWithWrongAnswer(answerType, typedValue);
+      return;
+    }
+
+    playErrorSound();
+    roundTimerRef.current = window.setTimeout(() => {
+      nextRound();
+    }, NEXT_ROUND_DELAY_MS);
   }
 
   function handleVideoError(): void {
@@ -1516,6 +1565,7 @@ export function App(): JSX.Element {
             loadingStatus={loadingStatus}
             canStart={canStart}
             mode={gameMode}
+            difficulty={gameDifficulty}
             characterOptions={characterOptions}
             sandboxCharacter={sandboxCharacter}
             sandboxFilters={sandboxFilters}
@@ -1526,6 +1576,7 @@ export function App(): JSX.Element {
             savedProgressLabel={savedProgressLabel}
             onNicknameChange={setNicknameInput}
             onModeChange={handleModeChange}
+            onDifficultyChange={setGameDifficulty}
             onSandboxCharacterChange={setSandboxCharacter}
             onSandboxFiltersChange={setSandboxFilters}
             onStart={startGame}
@@ -1538,10 +1589,13 @@ export function App(): JSX.Element {
           <section className="screen">
             <GameTopBar
               gameMode={gameMode}
+              gameDifficulty={gameDifficulty}
               nickname={nickname}
               currentRound={currentRound}
               totalRounds={totalRounds}
               score={score}
+              classicMistakes={classicMistakes}
+              classicMistakesLimit={classicDifficultyRules.maxMistakes}
               sandboxCurrentStreak={sandboxCurrentStreak}
               sandboxBestStreak={sandboxBestStreak}
               scoreGains={scoreGains}
@@ -1590,6 +1644,7 @@ export function App(): JSX.Element {
         {screen === "result" ? (
           <ResultScreen
             gameMode={gameMode}
+            gameDifficulty={gameDifficulty}
             nickname={nickname}
             correctAnswered={correctAnswered}
             totalAnswered={totalAnswered}
